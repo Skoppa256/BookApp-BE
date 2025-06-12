@@ -586,17 +586,6 @@ FOR EACH ROW
 EXECUTE FUNCTION kurangi_stok();
 
 -- 2.2.3 Manajemen Membership
-SELECT * FROM Membership
-SELECT * FROM Pelanggan
-CALL sp_kelola_membership(
-    'PL000003',
-    'Gold',
-    '08233445566',
-    '456 Oak Avenue',
-    '2025-06-10 10:00:00',
-    '2026-06-15 10:00:00'
-);
-
 CREATE OR REPLACE PROCEDURE sp_kelola_membership(
    IN p_pelanggan_id CHAR(8),
    IN p_tipe VARCHAR(20),
