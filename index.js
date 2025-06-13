@@ -7,8 +7,8 @@ const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 3000;
 
-console.log('DB_PASSWORD:', process.env.DB_PASSWORD);
-console.log('Type:', typeof process.env.DB_PASSWORD);
+app.use(express.json());
+
 
 
 const pool = new Pool({
@@ -185,6 +185,48 @@ app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
 
+// Proses penjualan buku
+//penjualan buku
+app.post('/penjualan', async (req, res) => {
+  const {
+    penjualan_id,
+    metode_pembayaran,
+    pelanggan_id,
+    pegawai_id,
+    buku_ids,
+    kuantitas,
+  } = req.body;
+
+  if (
+    !penjualan_id ||
+    !metode_pembayaran ||
+    !pelanggan_id ||
+    !pegawai_id ||
+    !Array.isArray(buku_ids) ||
+    !Array.isArray(kuantitas)
+  ) {
+    return res.status(400).json({ error: 'Semua field dan array harus diisi dengan benar.' });
+  }
+
+  if (buku_ids.length !== kuantitas.length) {
+    return res.status(400).json({ error: 'Jumlah item di array tidak konsisten.' });
+  }
+
+  try {
+    await pool.query(
+      'CALL penjualan_buku($1, $2, $3, $4, $5::CHAR(8)[], $6::INT[])',
+      [penjualan_id, metode_pembayaran, pelanggan_id, pegawai_id, buku_ids, kuantitas]
+    );
+    res.status(201).json({ message: 'Penjualan berhasil disimpan.' });
+  } catch (err) {
+    console.error('Error during penjualan:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+//
+
 // insert new membership
 app.post('/membership/insert', async (req, res) => {
   const {
@@ -208,6 +250,8 @@ app.post('/membership/insert', async (req, res) => {
   }
 });
 
+
+// Manajemen membership
 // Update membership
 app.put('/membership/update', async (req, res) => {
   const {

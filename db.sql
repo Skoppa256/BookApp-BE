@@ -501,71 +501,153 @@ $$ LANGUAGE plpgsql;
 
 
 -- Proses Penjualan
+-- CREATE OR REPLACE PROCEDURE penjualan_buku(
+-- 	IN p_penjualan_id CHAR(10),
+-- 	IN p_metode_pembayaran VARCHAR(20),
+-- 	IN p_pelanggan_id CHAR(8),
+-- 	IN p_pegawai_id CHAR(8),
+-- 	IN p_buku_id CHAR(8),
+-- 	IN p_kuantitas INT
+-- )
+-- LANGUAGE plpgsql
+-- AS $$
+-- DECLARE
+-- 	v_harga_jual DECIMAL(10, 2);
+-- 	v_subtotal DECIMAL(10, 2);
+-- 	v_diskon INT;
+-- 	v_tipe_membership VARCHAR(20);
+-- BEGIN
+-- 	IF NOT EXISTS (SELECT 1 FROM Pelanggan WHERE pelanggan_id = p_pelanggan_id) THEN
+-- 		RAISE EXCEPTION 'Pelanggan ID % tidak ditemukan', p_pelanggan_id;
+-- 	END IF;
+
+-- 	IF NOT EXISTS (SELECT 1 FROM Pegawai WHERE pegawai_id = p_pegawai_id) THEN
+-- 		RAISE EXCEPTION 'Pegawai ID % tidak ditemukan', p_pegawai_id;
+-- 	END IF;
+
+-- 	IF NOT EXISTS (SELECT 1 FROM Buku WHERE buku_id = p_buku_id) THEN
+-- 		RAISE EXCEPTION 'Buku ID % tidak ditemukan', p_buku_id;
+-- 	END IF;
+
+-- 	IF EXISTS (SELECT 1 FROM Penjualan WHERE penjualan_id = p_penjualan_id) THEN
+-- 		RAISE EXCEPTION 'Penjualan ID % sudah ada.', p_penjualan_id;
+-- 	END IF;
+	
+-- 	IF p_kuantitas <= 0 THEN
+-- 		RAISE EXCEPTION 'Kuantitas harus lebih dari 0';
+-- 	END IF;
+
+-- 	IF (SELECT jumlah_stok FROM Buku WHERE buku_id = p_buku_id) < p_kuantitas THEN
+-- 		RAISE EXCEPTION 'Stok buku % tidak cukup untuk penjualan', p_buku_id;
+-- 	END IF;
+
+-- 	SELECT harga_jual INTO v_harga_jual FROM Buku WHERE buku_id = p_buku_id;
+
+-- 	SELECT tipe INTO v_tipe_membership 
+-- 	FROM Membership
+-- 	WHERE pelanggan_id = p_pelanggan_id AND tanggal_kadaluwarsa > NOW()
+-- 	ORDER BY tanggal_kadaluwarsa DESC
+-- 	LIMIT 1;
+
+-- 	IF v_tipe_membership = 'Bronze' THEN
+-- 		v_diskon := 5;
+-- 	ELSIF v_tipe_membership = 'Silver' THEN
+-- 		v_diskon := 7.5;
+-- 	ELSIF v_tipe_membership = 'Gold' THEN
+-- 		v_diskon := 10;
+-- 	END IF;
+
+-- 	v_subtotal := (v_harga_jual * p_kuantitas) * (1 - v_diskon / 100);
+	
+-- 	INSERT INTO Penjualan(penjualan_id, tanggal_penjualan, metode_pembayaran, diskon, pelanggan_id, pegawai_id)
+-- 	VALUES (p_penjualan_id, NOW(), p_metode_pembayaran, v_diskon, p_pelanggan_id, p_pegawai_id);
+
+-- 	INSERT INTO Detail_Penjualan(penjualan_id, buku_id, kuantitas, subtotal)
+-- 	VALUES(p_penjualan_id, p_buku_id, p_kuantitas, v_subtotal);
+-- END;
+-- $$;
+
 CREATE OR REPLACE PROCEDURE penjualan_buku(
-	IN p_penjualan_id CHAR(10),
-	IN p_metode_pembayaran VARCHAR(20),
-	IN p_pelanggan_id CHAR(8),
-	IN p_pegawai_id CHAR(8),
-	IN p_buku_id CHAR(8),
-	IN p_kuantitas INT
+    IN p_penjualan_id CHAR(10),
+    IN p_metode_pembayaran VARCHAR(20),
+    IN p_pelanggan_id CHAR(8),
+    IN p_pegawai_id CHAR(8),
+    IN p_buku_ids CHAR(8)[],
+    IN p_kuantitas INT[]
 )
 LANGUAGE plpgsql
 AS $$
 DECLARE
-	v_harga_jual DECIMAL(10, 2);
-	v_subtotal DECIMAL(10, 2);
-	v_diskon INT;
-	v_tipe_membership VARCHAR(20);
+    i INT;
+    array_len INT := array_length(p_buku_ids, 1);
+    v_harga_jual DECIMAL(10, 2);
+    v_subtotal DECIMAL(10, 2);
+    v_diskon INT := 0;
+    v_tipe_membership VARCHAR(20);
 BEGIN
-	IF NOT EXISTS (SELECT 1 FROM Pelanggan WHERE pelanggan_id = p_pelanggan_id) THEN
-		RAISE EXCEPTION 'Pelanggan ID % tidak ditemukan', p_pelanggan_id;
-	END IF;
+    -- Validasi dasar
+    IF NOT EXISTS (SELECT 1 FROM Pelanggan WHERE pelanggan_id = p_pelanggan_id) THEN
+        RAISE EXCEPTION 'Pelanggan ID % tidak ditemukan', p_pelanggan_id;
+    END IF;
 
-	IF NOT EXISTS (SELECT 1 FROM Pegawai WHERE pegawai_id = p_pegawai_id) THEN
-		RAISE EXCEPTION 'Pegawai ID % tidak ditemukan', p_pegawai_id;
-	END IF;
+    IF NOT EXISTS (SELECT 1 FROM Pegawai WHERE pegawai_id = p_pegawai_id) THEN
+        RAISE EXCEPTION 'Pegawai ID % tidak ditemukan', p_pegawai_id;
+    END IF;
 
-	IF NOT EXISTS (SELECT 1 FROM Buku WHERE buku_id = p_buku_id) THEN
-		RAISE EXCEPTION 'Buku ID % tidak ditemukan', p_buku_id;
-	END IF;
+    IF array_len IS NULL OR array_len = 0 THEN
+        RAISE EXCEPTION 'Array buku tidak boleh kosong';
+    END IF;
 
-	IF EXISTS (SELECT 1 FROM Penjualan WHERE penjualan_id = p_penjualan_id) THEN
-		RAISE EXCEPTION 'Penjualan ID % sudah ada.', p_penjualan_id;
-	END IF;
-	
-	IF p_kuantitas <= 0 THEN
-		RAISE EXCEPTION 'Kuantitas harus lebih dari 0';
-	END IF;
+    IF EXISTS (SELECT 1 FROM Penjualan WHERE penjualan_id = p_penjualan_id) THEN
+        RAISE EXCEPTION 'Penjualan ID % sudah ada.', p_penjualan_id;
+    END IF;
 
-	IF (SELECT jumlah_stok FROM Buku WHERE buku_id = p_buku_id) < p_kuantitas THEN
-		RAISE EXCEPTION 'Stok buku % tidak cukup untuk penjualan', p_buku_id;
-	END IF;
+    -- Dapatkan tipe membership dan diskon
+    SELECT tipe INTO v_tipe_membership
+    FROM Membership
+    WHERE pelanggan_id = p_pelanggan_id AND tanggal_kadaluwarsa > NOW()
+    ORDER BY tanggal_kadaluwarsa DESC
+    LIMIT 1;
 
-	SELECT harga_jual INTO v_harga_jual FROM Buku WHERE buku_id = p_buku_id;
+    IF v_tipe_membership = 'Bronze' THEN
+        v_diskon := 5;
+    ELSIF v_tipe_membership = 'Silver' THEN
+        v_diskon := 7;
+    ELSIF v_tipe_membership = 'Gold' THEN
+        v_diskon := 10;
+    END IF;
 
-	SELECT tipe INTO v_tipe_membership 
-	FROM Membership
-	WHERE pelanggan_id = p_pelanggan_id AND tanggal_kadaluwarsa > NOW()
-	ORDER BY tanggal_kadaluwarsa DESC
-	LIMIT 1;
+    -- Masukkan header penjualan
+    INSERT INTO Penjualan(penjualan_id, tanggal_penjualan, metode_pembayaran, diskon, pelanggan_id, pegawai_id)
+    VALUES (p_penjualan_id, NOW(), p_metode_pembayaran, v_diskon, p_pelanggan_id, p_pegawai_id);
 
-	IF v_tipe_membership = 'Bronze' THEN
-		v_diskon := 5;
-	ELSIF v_tipe_membership = 'Silver' THEN
-		v_diskon := 7.5;
-	ELSIF v_tipe_membership = 'Gold' THEN
-		v_diskon := 10;
-	END IF;
+    -- Loop untuk setiap buku
+    FOR i IN 1..array_len LOOP
+        IF NOT EXISTS (SELECT 1 FROM Buku WHERE buku_id = p_buku_ids[i]) THEN
+            RAISE EXCEPTION 'Buku ID % tidak ditemukan', p_buku_ids[i];
+        END IF;
 
-	v_subtotal := (v_harga_jual * p_kuantitas) * (1 - v_diskon / 100);
-	
-	INSERT INTO Penjualan(penjualan_id, tanggal_penjualan, metode_pembayaran, diskon, pelanggan_id, pegawai_id)
-	VALUES (p_penjualan_id, NOW(), p_metode_pembayaran, v_diskon, p_pelanggan_id, p_pegawai_id);
+        IF p_kuantitas[i] <= 0 THEN
+            RAISE EXCEPTION 'Kuantitas harus > 0 untuk buku %', p_buku_ids[i];
+        END IF;
 
-	INSERT INTO Detail_Penjualan(penjualan_id, buku_id, kuantitas, subtotal)
-	VALUES(p_penjualan_id, p_buku_id, p_kuantitas, v_subtotal);
+        IF (SELECT jumlah_stok FROM Buku WHERE buku_id = p_buku_ids[i]) < p_kuantitas[i] THEN
+            RAISE EXCEPTION 'Stok buku % tidak cukup', p_buku_ids[i];
+        END IF;
+
+        -- Ambil harga jual dan hitung subtotal diskon
+        SELECT harga_jual INTO v_harga_jual FROM Buku WHERE buku_id = p_buku_ids[i];
+
+        v_subtotal := (v_harga_jual * p_kuantitas[i]) * (1 - v_diskon / 100.0);
+
+        -- Masukkan detail penjualan
+        INSERT INTO Detail_Penjualan(penjualan_id, buku_id, kuantitas, subtotal)
+        VALUES (p_penjualan_id, p_buku_ids[i], p_kuantitas[i], v_subtotal);
+    END LOOP;
 END;
 $$;
+
+
 
 -- Trigger function to subtract stock 
 CREATE OR REPLACE FUNCTION kurangi_stok()
