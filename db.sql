@@ -586,7 +586,9 @@ FOR EACH ROW
 EXECUTE FUNCTION kurangi_stok();
 
 -- 2.2.3 Manajemen Membership
-CREATE OR REPLACE PROCEDURE sp_kelola_membership(
+
+-- for insert new membership
+CREATE OR REPLACE PROCEDURE sp_insert_membership(
    IN p_pelanggan_id CHAR(8),
    IN p_tipe VARCHAR(20),
    IN p_no_telp VARCHAR(20),
@@ -609,26 +611,51 @@ BEGIN
    FROM Membership
    WHERE pelanggan_id = p_pelanggan_id;
 
-   IF membership_count = 0 THEN
-       -- INSERT data baru
-       INSERT INTO Membership (
-           pelanggan_id, tipe, no_telp, alamat,
-           tanggal_pembuatan, tanggal_kadaluwarsa
-       ) VALUES (
-           p_pelanggan_id, p_tipe, p_no_telp, p_alamat,
-           p_tanggal_pembuatan, p_tanggal_kadaluwarsa
-       );
-   ELSE
-       -- UPDATE data existing
-       UPDATE Membership
-       SET
-           tipe = p_tipe,
-           no_telp = p_no_telp,
-           alamat = p_alamat,
-           tanggal_pembuatan = p_tanggal_pembuatan,
-           tanggal_kadaluwarsa = p_tanggal_kadaluwarsa
-       WHERE pelanggan_id = p_pelanggan_id;
+   IF membership_count > 0 THEN
+       RAISE EXCEPTION 'Membership untuk pelanggan ID % sudah ada.', p_pelanggan_id;
    END IF;
+
+   -- INSERT data baru
+   INSERT INTO Membership (
+       pelanggan_id, tipe, no_telp, alamat,
+       tanggal_pembuatan, tanggal_kadaluwarsa
+   ) VALUES (
+       p_pelanggan_id, p_tipe, p_no_telp, p_alamat,
+       p_tanggal_pembuatan, p_tanggal_kadaluwarsa
+   );
+END;
+$$;
+
+-- for update existing membership
+CREATE OR REPLACE PROCEDURE sp_update_membership(
+   IN p_pelanggan_id CHAR(8),
+   IN p_tipe VARCHAR(20),
+   IN p_no_telp VARCHAR(20),
+   IN p_alamat VARCHAR(150),
+   IN p_tanggal_kadaluwarsa TIMESTAMP
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+   membership_count INT;
+BEGIN
+   -- Cek apakah membership ada
+   SELECT COUNT(*) INTO membership_count
+   FROM Membership
+   WHERE pelanggan_id = p_pelanggan_id;
+
+   IF membership_count = 0 THEN
+       RAISE EXCEPTION 'Membership untuk pelanggan ID % tidak ditemukan.', p_pelanggan_id;
+   END IF;
+
+   -- UPDATE data existing 
+   UPDATE Membership
+   SET
+       tipe = p_tipe,
+       no_telp = p_no_telp,
+       alamat = p_alamat,
+       tanggal_kadaluwarsa = p_tanggal_kadaluwarsa
+   WHERE pelanggan_id = p_pelanggan_id;
 END;
 $$;
 

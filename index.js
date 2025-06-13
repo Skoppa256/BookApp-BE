@@ -7,6 +7,10 @@ const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 3000;
 
+console.log('DB_PASSWORD:', process.env.DB_PASSWORD);
+console.log('Type:', typeof process.env.DB_PASSWORD);
+
+
 const pool = new Pool({
   user: process.env.DB_USER,
   host: process.env.DB_HOST,
@@ -179,4 +183,49 @@ app.get('/pelanggan', async (req, res) => {
 // Start server
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
+});
+
+// insert new membership
+app.post('/membership/insert', async (req, res) => {
+  const {
+    pelanggan_id,
+    tipe,
+    no_telp,
+    alamat,
+    tanggal_pembuatan,
+    tanggal_kadaluwarsa
+  } = req.body;
+
+  try {
+    await pool.query(
+      'CALL sp_insert_membership($1, $2, $3, $4, $5, $6)',
+      [pelanggan_id, tipe, no_telp, alamat, tanggal_pembuatan, tanggal_kadaluwarsa]
+    );
+    res.status(201).json({ data: 'Membership berhasil ditambahkan.' });
+  } catch (err) {
+    console.error('Error in sp_insert_membership:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update membership
+app.put('/membership/update', async (req, res) => {
+  const {
+    pelanggan_id,
+    tipe,
+    no_telp,
+    alamat,
+    tanggal_kadaluwarsa
+  } = req.body;
+
+  try {
+    await pool.query(
+      'CALL sp_update_membership($1, $2, $3, $4, $5)',
+      [pelanggan_id, tipe, no_telp, alamat, tanggal_kadaluwarsa]
+    );
+    res.status(200).json({ data: 'Membership berhasil diperbarui.' });
+  } catch (err) {
+    console.error('Error in sp_update_membership:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
