@@ -91,21 +91,25 @@ app.get('/api/rekomendasi-pembelian', async (req, res) => {
 });
 
 // Cari Buku
-// GET /cari-buku?judul=Harry&penulis=&kategori=
+// GET /cari-buku?kategori=Harry
 app.get('/api/cari-buku', async (req, res) => {
-    const { keyword } = req.query;
+    const { keyword, kategori, tahun_terbit } = req.query;
   
     try {
       const result = await pool.query(
-        'SELECT * FROM cari_buku($1)',
-        [keyword || null]
+        `SELECT * FROM cari_buku($1::TEXT, $2::VARCHAR, $3::INT)`,
+        [
+          keyword || null,
+          kategori || null,
+          tahun_terbit ? parseInt(tahun_terbit) : null
+        ]
       );
       res.json({ data: result.rows });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
-});
-  
+});  
+
 
 // Pembelian Buku
 app.post('/api/pembelian-buku', async (req, res) => {
@@ -152,6 +156,7 @@ app.post('/api/pembelian-buku', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // Get Pelanggan by No Telp
 app.get('/api/pelanggan', async (req, res) => {
