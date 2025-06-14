@@ -37,10 +37,51 @@ SELECT * FROM cari_buku(NULL, 'Jane Austen', NULL);
 SELECT * FROM cari_buku(NULL, NULL, 'Fiction');
 
 -- Procedure penjualan_buku (stok cukup)
-CALL penjualan_buku('PJ0000006', 'Tunai', 'PL000003', 'PG000002', 'BK000002', 10);
+-- CALL penjualan_buku('PJ0000006', 'Tunai', 'PL000003', 'PG000002', 'BK000002', 10);
+
+CALL penjualan_buku(
+  'PJ000009',               -- penjualan_id
+  'Kartu',                  -- metode_pembayaran
+  'PL000002',               -- pelanggan_id
+  'PG000003',               -- pegawai_id
+  ARRAY['BK000001', 'BK000003'], -- buku_ids
+  ARRAY[2, 1]                    -- kuantitas
+);
+
+{
+  "penjualan_id": "PJ000009",
+  "metode_pembayaran": "Kartu",
+  "pelanggan_id": "PL000002",
+  "pegawai_id": "PG000003",
+  "buku_ids": ["BK000001", "BK000003"],
+  "kuantitas": [2, 1]
+}
+
+
+--json:
+-- {
+--   "penjualan_id": "PJ0000006",
+--   "metode_pembayaran": "Tunai",
+--   "pelanggan_id": "PL000003",
+--   "pegawai_id": "PG000002",
+--   "buku_id": "BK000002",
+--   "kuantitas": 10
+-- }
+
 
 -- Procedure penjualan_buku (stok tidak cukup)
 CALL penjualan_buku('PJ0000007', 'Tunai', 'PL000003', 'PG000002', 'BK000002', 100);
+
+-- json:
+-- {
+--   "penjualan_id": "PJ0000007",
+--   "metode_pembayaran": "Tunai",
+--   "pelanggan_id": "PL000003",
+--   "pegawai_id": "PG000002",
+--   "buku_id": "BK000002",
+--   "kuantitas": 100
+-- }
+
 
 -- View laporan_buku_terlaris
 SELECT * FROM laporan_buku_terlaris;
@@ -57,3 +98,23 @@ CALL tambah_buku_baru(
     'KT002', 'PB0002', 'PN0002',
     2023, 300, 70000.00, 50
 );
+
+-- Procedure insert membership
+CALL sp_insert_membership(
+  'PL000006',              -- pelanggan_id (CHAR(8))
+  'Gold',                  -- tipe (VARCHAR)
+  '08123456789',           -- no_telp (VARCHAR)
+  'Jl. Merdeka 123',       -- alamat (VARCHAR)
+  TIMESTAMP '2025-06-13 10:00:00',  -- tanggal_pembuatan
+  TIMESTAMP '2026-06-13 10:00:00'   -- tanggal_kadaluwarsa
+);
+
+-- Procedure update membership
+CALL sp_update_membership(
+  'PL000001',              -- pelanggan_id (CHAR(8))
+  'Platinum',              -- tipe (VARCHAR)
+  '08123456789',           -- no_telp (VARCHAR)
+  'Jl. Merdeka Baru 456',  -- alamat (VARCHAR)
+  TIMESTAMP '2027-06-13 10:00:00'   -- tanggal_kadaluwarsa
+);
+

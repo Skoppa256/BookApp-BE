@@ -7,6 +7,8 @@ const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 3000;
 
+app.use(express.json());
+
 const pool = new Pool({
   user: process.env.DB_USER,
   host: process.env.DB_HOST,
@@ -50,7 +52,7 @@ tables.forEach((table) => {
 });
 
 // Login Pegawai
-app.post('/login', async (req, res) => {
+app.post('/api/login', async (req, res) => {
   const { email, no_telp } = req.body;
   if (!email || !no_telp) {
     return res
@@ -76,7 +78,7 @@ app.post('/login', async (req, res) => {
 });
 
 // Rekomendasi Pembelian
-app.get('/rekomendasi-pembelian', async (req, res) => {
+app.get('/api/rekomendasi-pembelian', async (req, res) => {
   const { max_stock } = req.query;
   try {
     const result = await pool.query('SELECT * FROM rekomendasi_pembelian($1)', [
@@ -90,7 +92,7 @@ app.get('/rekomendasi-pembelian', async (req, res) => {
 
 // Cari Buku
 // GET /cari-buku?judul=Harry&penulis=&kategori=
-app.get('/cari-buku', async (req, res) => {
+app.get('/api/cari-buku', async (req, res) => {
   const { judul, penulis, kategori, isbn, tahun_terbit } = req.query;
   try {
     const result = await pool.query(
@@ -110,7 +112,7 @@ app.get('/cari-buku', async (req, res) => {
 });
 
 // Pembelian Buku
-app.post('/pembelian-buku', async (req, res) => {
+app.post('/api/pembelian-buku', async (req, res) => {
   const {
     supplier_id,
     pegawai_id,
@@ -156,7 +158,7 @@ app.post('/pembelian-buku', async (req, res) => {
 });
 
 // Get Pelanggan by No Telp
-app.get('/pelanggan', async (req, res) => {
+app.get('/api/pelanggan', async (req, res) => {
   const { no_telp } = req.query;
   if (!no_telp) {
     return res.status(400).json({ error: 'Nomor telepon harus diisi.' });
@@ -172,6 +174,96 @@ app.get('/pelanggan', async (req, res) => {
     res.json({ data: result.rows[0] });
   } catch (err) {
     console.error('Error fetching pelanggan:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Proses penjualan buku
+//penjualan buku
+app.post('/api/penjualan', async (req, res) => {
+  const {
+    metode_pembayaran,
+    no_telp_pelanggan,
+    pegawai_id,
+    buku_ids,
+    kuantitas,
+  } = req.body;
+
+  if (
+    !metode_pembayaran ||
+    !no_telp_pelanggan ||
+    !pegawai_id ||
+    !Array.isArray(buku_ids) ||
+    !Array.isArray(kuantitas)
+  ) {
+    return res
+      .status(400)
+      .json({ error: 'Semua field dan array harus diisi dengan benar.' });
+  }
+
+  if (buku_ids.length !== kuantitas.length) {
+    return res
+      .status(400)
+      .json({ error: 'Jumlah item di array tidak konsisten.' });
+  }
+
+  try {
+    await pool.query(
+      'CALL penjualan_buku($1, $2, $3, $4::CHAR(8)[], $5::INT[])',
+      [metode_pembayaran, no_telp_pelanggan, pegawai_id, buku_ids, kuantitas]
+    );
+    res.status(201).json({ message: 'Penjualan berhasil disimpan.' });
+  } catch (err) {
+    console.error('Error during penjualan:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+//
+
+// insert new membership
+app.post('/api/membership/insert', async (req, res) => {
+  const {
+    pelanggan_id,
+    tipe,
+    no_telp,
+    alamat,
+    tanggal_pembuatan,
+    tanggal_kadaluwarsa,
+  } = req.body;
+
+  try {
+    await pool.query('CALL sp_insert_membership($1, $2, $3, $4, $5, $6)', [
+      pelanggan_id,
+      tipe,
+      no_telp,
+      alamat,
+      tanggal_pembuatan,
+      tanggal_kadaluwarsa,
+    ]);
+    res.status(201).json({ data: 'Membership berhasil ditambahkan.' });
+  } catch (err) {
+    console.error('Error in sp_insert_membership:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Manajemen membership
+// Update membership
+app.put('/api/membership/update', async (req, res) => {
+  const { pelanggan_id, tipe, no_telp, alamat, tanggal_kadaluwarsa } = req.body;
+
+  try {
+    await pool.query('CALL sp_update_membership($1, $2, $3, $4, $5)', [
+      pelanggan_id,
+      tipe,
+      no_telp,
+      alamat,
+      tanggal_kadaluwarsa,
+    ]);
+    res.status(200).json({ data: 'Membership berhasil diperbarui.' });
+  } catch (err) {
+    console.error('Error in sp_update_membership:', err);
     res.status(500).json({ error: err.message });
   }
 });
