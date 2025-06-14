@@ -180,7 +180,7 @@ app.get('/api/pelanggan', async (req, res) => {
 
 // Proses penjualan buku
 //penjualan buku
-app.post('/api/penjualan', async (req, res) => {
+app.post('/api/penjualan-buku', async (req, res) => {
   const {
     metode_pembayaran,
     no_telp_pelanggan,

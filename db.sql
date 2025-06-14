@@ -584,6 +584,7 @@ DECLARE
     v_subtotal DECIMAL(10, 2);
     v_diskon INT := 0;
     v_tipe_membership VARCHAR(20);
+	new_penjualan_id CHAR(10);
 BEGIN
     -- Validasi dasar
     IF NOT EXISTS (SELECT 1 FROM Membership WHERE no_telp = p_pelanggan_no_telp) THEN
@@ -619,7 +620,8 @@ BEGIN
 
     -- Masukkan header penjualan
     INSERT INTO Penjualan(tanggal_penjualan, metode_pembayaran, diskon, pelanggan_id, pegawai_id)
-    VALUES (NOW(), p_metode_pembayaran, v_diskon, v_pelanggan_id, p_pegawai_id);
+    VALUES (NOW(), p_metode_pembayaran, v_diskon, v_pelanggan_id, p_pegawai_id)
+	RETURNING penjualan_id INTO new_penjualan_id;
 
     -- Loop untuk setiap buku
     FOR i IN 1..array_len LOOP
@@ -642,7 +644,7 @@ BEGIN
 
         -- Masukkan detail penjualan
         INSERT INTO Detail_Penjualan(penjualan_id, buku_id, kuantitas, subtotal)
-        VALUES (p_penjualan_id, p_buku_ids[i], p_kuantitas[i], v_subtotal);
+        VALUES (new_penjualan_id, p_buku_ids[i], p_kuantitas[i], v_subtotal);
     END LOOP;
 END;
 $$;
