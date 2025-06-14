@@ -29,8 +29,6 @@ const tables = [
   'Membership',
   'Penulis',
   'Penerbit',
-  'Pembelian',
-  'Penjualan',
   'Detail_Penjualan',
   'Detail_Pembelian',
   'Buku_Penulis',
@@ -47,6 +45,317 @@ tables.forEach((table) => {
     }
   });
 });
+
+// Daftar Pembelian
+app.get('/api/pembelian', async(req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT p.pembelian_id, DATE(p.tanggal_pembelian) AS tanggal_pembelian, peg.nama AS nama_pegawai, s.nama AS nama_supplier, det.kuantitas, det.total
+            FROM (SELECT pembelian_id, SUM(subtotal) AS total, SUM(kuantitas) AS kuantitas
+                FROM detail_pembelian
+                GROUP BY pembelian_id) det 
+            JOIN pembelian p ON (p.pembelian_id = det.pembelian_id)
+            JOIN pegawai peg ON (p.pegawai_id = peg.pegawai_id)
+            JOIN supplier s ON (p.supplier_id = s.supplier_id)`);
+        res.json({ data: result.rows });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Daftar Penjualan
+app.get('/api/penjualan', async(req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT p.penjualan_id, DATE(p.tanggal_penjualan) AS tanggal_penjualan, p.metode_pembayaran, p.diskon , pel.nama AS nama_pelanggan, peg.nama AS nama_pegawai, det.kuantitas, det.total
+            FROM (SELECT penjualan_id, SUM(subtotal) AS total, SUM(kuantitas) AS kuantitas
+                FROM detail_penjualan
+                GROUP BY penjualan_id) det 
+            JOIN penjualan p ON (p.penjualan_id = det.penjualan_id)
+            JOIN pegawai peg ON (p.pegawai_id = peg.pegawai_id)
+            JOIN pelanggan pel ON (p.pelanggan_id = pel.pelanggan_id)`);
+        res.json({ data: result.rows });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Detail Pembelian by ID
+app.get('/api/detail_pembelian', async (req, res) => {
+    const { pembelian_id } = req.query;
+  
+    try {
+      const detail = await pool.query(`
+        SELECT p.pembelian_id, p.tanggal_pembelian, s.nama AS nama_supplier, peg.nama AS nama_pegawai
+        FROM pembelian p
+        JOIN supplier s ON (p.supplier_id = s.supplier_id)
+        JOIN pegawai peg ON (peg.pegawai_id = p.pegawai_id)
+        WHERE pembelian_id = $1
+        `, [pembelian_id]);
+
+      const buku = await pool.query(`
+        SELECT 
+            b.judul, 
+            STRING_AGG(pen.nama_penulis, ', ') AS penulis,
+            p.nama AS nama_penerbit, 
+            k.nama AS nama_kategori, 
+            b.isbn, 
+            b.tahun_terbit, 
+            b.jumlah_halaman, 
+            b.harga_beli, 
+            b.harga_jual, 
+            det.kuantitas, 
+            det.subtotal
+        FROM detail_pembelian det
+        JOIN buku b ON b.buku_id = det.buku_id
+        JOIN penerbit p ON p.penerbit_id = b.penerbit_id
+        JOIN kategori k ON k.kategori_id = b.kategori_id
+        JOIN buku_penulis bp ON bp.buku_id = b.buku_id
+        JOIN penulis pen ON pen.penulis_id = bp.penulis_id
+        WHERE det.pembelian_id = $1
+        GROUP BY 
+            b.judul, p.nama, k.nama, b.isbn, b.tahun_terbit, 
+            b.jumlah_halaman, b.harga_beli, b.harga_jual, 
+            det.kuantitas, det.subtotal
+      `, [pembelian_id]);
+  
+      const totalResult = await pool.query(`
+        SELECT SUM(subtotal) AS total
+        FROM detail_pembelian
+        WHERE pembelian_id = $1
+      `, [pembelian_id]);
+  
+      res.json({
+        detail: detail.rows,
+        buku: buku.rows,
+        total: totalResult.rows[0].total
+      });
+  
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+});
+  
+// Detail Penjualan by ID
+app.get('/api/detail_penjualan', async (req, res) => {
+    const { penjualan_id } = req.query;
+  
+    try {
+      const detail = await pool.query(`
+        SELECT p.penjualan_id, p.tanggal_penjualan, pel.nama AS nama_pelanggan, peg.nama AS nama_pegawai
+        FROM penjualan p
+        JOIN pelanggan pel ON (p.pelanggan_id = pel.pelanggan_id)
+        JOIN pegawai peg ON (peg.pegawai_id = p.pegawai_id)
+        WHERE penjualan_id = $1
+        `, [penjualan_id]);
+
+      const buku = await pool.query(`
+        SELECT 
+            b.judul, 
+            STRING_AGG(pen.nama_penulis, ', ') AS penulis,
+            p.nama AS nama_penerbit, 
+            k.nama AS nama_kategori, 
+            b.isbn, 
+            b.tahun_terbit, 
+            b.jumlah_halaman, 
+            b.harga_beli, 
+            b.harga_jual, 
+            det.kuantitas, 
+            det.subtotal
+        FROM detail_penjualan det
+        JOIN buku b ON b.buku_id = det.buku_id
+        JOIN penerbit p ON p.penerbit_id = b.penerbit_id
+        JOIN kategori k ON k.kategori_id = b.kategori_id
+        JOIN buku_penulis bp ON bp.buku_id = b.buku_id
+        JOIN penulis pen ON pen.penulis_id = bp.penulis_id
+        WHERE det.penjualan_id = $1
+        GROUP BY 
+            b.judul, p.nama, k.nama, b.isbn, b.tahun_terbit, 
+            b.jumlah_halaman, b.harga_beli, b.harga_jual, 
+            det.kuantitas, det.subtotal
+      `, [penjualan_id]);
+  
+      const totalResult = await pool.query(`
+        SELECT SUM(subtotal) AS total
+        FROM detail_penjualan
+        WHERE penjualan_id = $1
+      `, [penjualan_id]);
+  
+      res.json({
+        detail: detail.rows,
+        buku: buku.rows,
+        total: totalResult.rows[0].total
+      });
+  
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+});
+
+// Detail Pegawai by ID
+app.get('/api/detail_pegawai', async (req, res) => {
+    const { pegawai_id } = req.query;
+  
+    try {
+      const detailPegawai = await pool.query(`SELECT p.* FROM Pegawai p WHERE p.pegawai_id = $1`, [pegawai_id]);
+  
+      const daftarPembelian = await pool.query(`
+        SELECT p.pembelian_id, DATE(p.tanggal_pembelian) AS tanggal_pembelian, peg.nama AS nama_pegawai, s.nama AS nama_supplier, det.kuantitas, det.total
+        FROM (SELECT pembelian_id, SUM(subtotal) AS total, SUM(kuantitas) AS kuantitas
+            FROM detail_pembelian
+            GROUP BY pembelian_id) det 
+        JOIN pembelian p ON (p.pembelian_id = det.pembelian_id)
+        JOIN pegawai peg ON (p.pegawai_id = peg.pegawai_id)
+        JOIN supplier s ON (p.supplier_id = s.supplier_id)
+        WHERE p.pegawai_id = $1
+      `, [pegawai_id]);
+
+      const rekapPembelian = await pool.query(`
+        SELECT SUM(kuantitas) AS kuantitas, SUM(total) AS total
+        FROM (SELECT pembelian_id, SUM(subtotal) AS total, SUM(kuantitas) AS kuantitas
+            FROM detail_pembelian
+            GROUP BY pembelian_id) det 
+        JOIN pembelian p ON (p.pembelian_id = det.pembelian_id)
+        WHERE p.pegawai_id = $1
+      `, [pegawai_id]);
+
+      const daftarPenjualan = await pool.query(`
+        SELECT p.penjualan_id, DATE(p.tanggal_penjualan) AS tanggal_penjualan, p.metode_pembayaran, p.diskon , pel.nama AS nama_pelanggan, peg.nama AS nama_pegawai, det.kuantitas, det.total
+        FROM (SELECT penjualan_id, SUM(subtotal) AS total, SUM(kuantitas) AS kuantitas
+            FROM detail_penjualan
+            GROUP BY penjualan_id) det 
+        JOIN penjualan p ON (p.penjualan_id = det.penjualan_id)
+        JOIN pegawai peg ON (p.pegawai_id = peg.pegawai_id)
+        JOIN pelanggan pel ON (p.pelanggan_id = pel.pelanggan_id)
+        WHERE p.pegawai_id = $1
+      `, [pegawai_id]);
+
+      const rekapPenjualan = await pool.query(`
+        SELECT SUM(kuantitas) AS kuantitas, SUM(total) AS total
+        FROM (SELECT penjualan_id, SUM(subtotal) AS total, SUM(kuantitas) AS kuantitas
+            FROM detail_penjualan
+            GROUP BY penjualan_id) det 
+        JOIN penjualan p ON (p.penjualan_id = det.penjualan_id)
+        WHERE p.pegawai_id = $1
+      `, [pegawai_id]);
+  
+      res.json({
+        detail: detailPegawai.rows,
+        pembelian: daftarPembelian.rows,
+        kuantitas_pembelian: rekapPembelian.rows[0].kuantitas,
+        total_pembelian: rekapPembelian.rows[0].total,
+        penjualan: daftarPenjualan.rows,
+        kuantitas_penjualan: rekapPenjualan.rows[0].kuantitas,
+        total_penjualan: rekapPenjualan.rows[0].total
+      });
+  
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+});
+
+
+// Detail Pelanggan by ID
+app.get('/api/detail_pelanggan', async (req, res) => {
+    const { pelanggan_id } = req.query;
+  
+    try {
+      const detailPelanggan = await pool.query(`
+        SELECT p.nama, m.tipe, m.no_telp, m.alamat, m.tanggal_pembuatan, m.tanggal_kadaluwarsa
+        FROM pelanggan p
+        JOIN membership m ON (p.pelanggan_id = m.pelanggan_id)
+        WHERE p.pelanggan_id = $1
+        `, [pelanggan_id]);
+
+      const daftarPenjualan = await pool.query(`
+        SELECT p.penjualan_id, DATE(p.tanggal_penjualan) AS tanggal_penjualan, p.metode_pembayaran, p.diskon , pel.nama AS nama_pelanggan, peg.nama AS nama_pegawai, det.kuantitas, det.total
+        FROM (SELECT penjualan_id, SUM(subtotal) AS total, SUM(kuantitas) AS kuantitas
+            FROM detail_penjualan
+            GROUP BY penjualan_id) det 
+        JOIN penjualan p ON (p.penjualan_id = det.penjualan_id)
+        JOIN pegawai peg ON (p.pegawai_id = peg.pegawai_id)
+        JOIN pelanggan pel ON (p.pelanggan_id = pel.pelanggan_id)
+        WHERE p.pelanggan_id = $1
+      `, [pelanggan_id]);
+
+      const rekapPenjualan = await pool.query(`
+        SELECT SUM(kuantitas) AS kuantitas, SUM(total) AS total
+        FROM (SELECT penjualan_id, SUM(subtotal) AS total, SUM(kuantitas) AS kuantitas
+            FROM detail_penjualan
+            GROUP BY penjualan_id) det 
+        JOIN penjualan p ON (p.penjualan_id = det.penjualan_id)
+        WHERE p.pelanggan_id = $1
+      `, [pelanggan_id]);
+  
+      res.json({
+        detail: detailPelanggan.rows,
+        penjualan: daftarPenjualan.rows,
+        kuantitas_penjualan: rekapPenjualan.rows[0].kuantitas,
+        total_penjualan: rekapPenjualan.rows[0].total
+      });
+  
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+});
+
+
+// Detail Buku by ID
+app.get('/api/detail_buku', async (req, res) => {
+    const { buku_id } = req.query;
+  
+    try {
+      const detailBuku = await pool.query(`
+        SELECT 
+            b.judul,
+            STRING_AGG(pen.nama_penulis, ', ') AS penulis,
+            p.nama AS nama_penerbit, 
+            k.nama AS nama_kategori, 
+            b.isbn, 
+            b.tahun_terbit, 
+            b.jumlah_halaman, 
+            b.harga_beli, 
+            b.harga_jual
+        FROM buku b
+        JOIN penerbit p ON p.penerbit_id = b.penerbit_id
+        JOIN kategori k ON k.kategori_id = b.kategori_id
+        JOIN buku_penulis bp ON bp.buku_id = b.buku_id
+        JOIN penulis pen ON pen.penulis_id = bp.penulis_id
+        WHERE b.buku_id = $1
+        GROUP BY 
+            b.judul, p.nama, k.nama, b.isbn, b.tahun_terbit, 
+            b.jumlah_halaman, b.harga_beli, b.harga_jual
+        `, [buku_id]);
+
+      const daftarPenjualan = await pool.query(`
+        SELECT p.penjualan_id, pel.nama AS nama_pelanggan, peg.nama AS nama_pegawai, p.tanggal_penjualan, det.kuantitas, det.subtotal
+        FROM detail_penjualan det
+        JOIN penjualan p ON (det.penjualan_id = p.penjualan_id)
+        JOIN pegawai peg ON (p.pegawai_id = peg.pegawai_id)
+        JOIN pelanggan pel ON (p.pelanggan_id = pel.pelanggan_id)
+        WHERE buku_id = $1
+      `, [buku_id]);
+
+      const daftarPembelian = await pool.query(`
+        SELECT p.pembelian_id, sup.nama AS nama_supplier, peg.nama AS nama_pegawai, p.tanggal_pembelian, det.kuantitas, det.subtotal
+        FROM detail_pembelian det
+        JOIN pembelian p ON (det.pembelian_id = p.pembelian_id)
+        JOIN pegawai peg ON (p.pegawai_id = peg.pegawai_id)
+        JOIN supplier sup ON (p.supplier_id = sup.supplier_id)
+        WHERE buku_id = $1
+      `, [buku_id]);
+  
+      res.json({
+        detail: detailBuku.rows,
+        penjualan: daftarPenjualan.rows,
+        pembelian: daftarPembelian.rows
+      });
+  
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+});
+
 
 // Login Pegawai
 app.post('/api/login', async (req, res) => {
