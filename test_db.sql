@@ -27,14 +27,7 @@ CALL pembelian_buku(
 );
 
 -- Function cari_buku
-Berdasarkan judul buku
-SELECT * FROM cari_buku('Harry', NULL, NULL);
-
--- Berdasarkan nama penulis
-SELECT * FROM cari_buku(NULL, 'Jane Austen', NULL);
-
--- Berdasarkan kategori
-SELECT * FROM cari_buku(NULL, NULL, 'Fiction');
+SELECT * FROM cari_buku('Harry');
 
 -- Procedure penjualan_buku (stok cukup)
 CALL penjualan_buku(

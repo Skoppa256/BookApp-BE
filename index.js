@@ -93,23 +93,19 @@ app.get('/api/rekomendasi-pembelian', async (req, res) => {
 // Cari Buku
 // GET /cari-buku?judul=Harry&penulis=&kategori=
 app.get('/api/cari-buku', async (req, res) => {
-  const { judul, penulis, kategori, isbn, tahun_terbit } = req.query;
-  try {
-    const result = await pool.query(
-      'SELECT * FROM cari_buku($1, $2, $3, $4, $5)',
-      [
-        judul || null,
-        penulis || null,
-        kategori || null,
-        isbn || null,
-        tahun_terbit || null,
-      ]
-    );
-    res.json({ data: result.rows });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    const { keyword } = req.query;
+  
+    try {
+      const result = await pool.query(
+        'SELECT * FROM cari_buku($1)',
+        [keyword || null]
+      );
+      res.json({ data: result.rows });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
 });
+  
 
 // Pembelian Buku
 app.post('/api/pembelian-buku', async (req, res) => {
