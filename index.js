@@ -91,25 +91,25 @@ app.get('/api/rekomendasi-pembelian', async (req, res) => {
 });
 
 // Cari Buku
-// GET /cari-buku?judul=Harry&penulis=&kategori=
+// GET /cari-buku?kategori=Harry
 app.get('/api/cari-buku', async (req, res) => {
-  const { judul, penulis, kategori, isbn, tahun_terbit } = req.query;
-  try {
-    const result = await pool.query(
-      'SELECT * FROM cari_buku($1, $2, $3, $4, $5)',
-      [
-        judul || null,
-        penulis || null,
-        kategori || null,
-        isbn || null,
-        tahun_terbit || null,
-      ]
-    );
-    res.json({ data: result.rows });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+    const { keyword, kategori, tahun_terbit } = req.query;
+  
+    try {
+      const result = await pool.query(
+        `SELECT * FROM cari_buku($1::TEXT, $2::VARCHAR, $3::INT)`,
+        [
+          keyword || null,
+          kategori || null,
+          tahun_terbit ? parseInt(tahun_terbit) : null
+        ]
+      );
+      res.json({ data: result.rows });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+});  
+
 
 // Pembelian Buku
 app.post('/api/pembelian-buku', async (req, res) => {
@@ -157,6 +157,7 @@ app.post('/api/pembelian-buku', async (req, res) => {
   }
 });
 
+
 // Get Pelanggan by No Telp
 app.get('/api/pelanggan', async (req, res) => {
   const { no_telp } = req.query;
@@ -180,7 +181,7 @@ app.get('/api/pelanggan', async (req, res) => {
 
 // Proses penjualan buku
 //penjualan buku
-app.post('/api/penjualan', async (req, res) => {
+app.post('/api/penjualan-buku', async (req, res) => {
   const {
     metode_pembayaran,
     no_telp_pelanggan,

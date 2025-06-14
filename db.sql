@@ -455,10 +455,8 @@ EXECUTE FUNCTION tambah_stok();
 
 -- Pencarian buku 
 CREATE OR REPLACE FUNCTION cari_buku(
-    p_judul VARCHAR(100) DEFAULT NULL,
-    p_nama_penulis VARCHAR(100) DEFAULT NULL,
-    p_kategori VARCHAR(100) DEFAULT NULL,
-    p_isbn CHAR(13) DEFAULT NULL,
+    p_keyword TEXT DEFAULT NULL,
+    p_kategori VARCHAR(50) DEFAULT NULL,
     p_tahun_terbit INT DEFAULT NULL
 )
 RETURNS TABLE (
@@ -490,10 +488,12 @@ BEGIN
     JOIN Penulis p ON p.penulis_id = bp.penulis_id
     JOIN Kategori k ON k.kategori_id = b.kategori_id
     WHERE
-        (p_judul IS NULL OR LOWER(b.judul) LIKE LOWER('%' || p_judul || '%')) AND
-        (p_nama_penulis IS NULL OR LOWER(p.nama_penulis) LIKE LOWER('%' || p_nama_penulis || '%')) AND
+        (p_keyword IS NULL OR (
+            b.isbn = p_keyword OR
+            LOWER(b.judul) LIKE LOWER('%' || p_keyword || '%') OR
+            LOWER(p.nama_penulis) LIKE LOWER('%' || p_keyword || '%')
+        )) AND
         (p_kategori IS NULL OR LOWER(k.nama) LIKE LOWER('%' || p_kategori || '%')) AND
-        (p_isbn IS NULL OR b.isbn = p_isbn) AND
         (p_tahun_terbit IS NULL OR b.tahun_terbit = p_tahun_terbit)
     ORDER BY b.judul;
 END;
@@ -584,6 +584,10 @@ DECLARE
     v_subtotal DECIMAL(10, 2);
     v_diskon INT := 0;
     v_tipe_membership VARCHAR(20);
+<<<<<<< HEAD
+=======
+	new_penjualan_id CHAR(10);
+>>>>>>> 037f6769e8ee4468f9d49f0ecd0435a5fafc256b
 BEGIN
     -- Validasi dasar
     IF NOT EXISTS (SELECT 1 FROM Membership WHERE no_telp = p_pelanggan_no_telp) THEN
@@ -619,7 +623,12 @@ BEGIN
 
     -- Masukkan header penjualan
     INSERT INTO Penjualan(tanggal_penjualan, metode_pembayaran, diskon, pelanggan_id, pegawai_id)
+<<<<<<< HEAD
     VALUES (NOW(), p_metode_pembayaran, v_diskon, v_pelanggan_id, p_pegawai_id);
+=======
+    VALUES (NOW(), p_metode_pembayaran, v_diskon, v_pelanggan_id, p_pegawai_id)
+	RETURNING penjualan_id INTO new_penjualan_id;
+>>>>>>> 037f6769e8ee4468f9d49f0ecd0435a5fafc256b
 
     -- Loop untuk setiap buku
     FOR i IN 1..array_len LOOP
@@ -642,7 +651,11 @@ BEGIN
 
         -- Masukkan detail penjualan
         INSERT INTO Detail_Penjualan(penjualan_id, buku_id, kuantitas, subtotal)
+<<<<<<< HEAD
         VALUES (p_penjualan_id, p_buku_ids[i], p_kuantitas[i], v_subtotal);
+=======
+        VALUES (new_penjualan_id, p_buku_ids[i], p_kuantitas[i], v_subtotal);
+>>>>>>> 037f6769e8ee4468f9d49f0ecd0435a5fafc256b
     END LOOP;
 END;
 $$;
