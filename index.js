@@ -27,11 +27,8 @@ app.get('/ping', (req, res) => {
 const tables = [
   'Pegawai',
   'Membership',
-  'Supplier',
   'Penulis',
   'Penerbit',
-  'Kategori',
-  'Buku',
   'Pembelian',
   'Penjualan',
   'Detail_Penjualan',
@@ -93,41 +90,33 @@ app.get('/api/rekomendasi-pembelian', async (req, res) => {
 // Cari Buku
 // GET /cari-buku?kategori=Harry
 app.get('/api/cari-buku', async (req, res) => {
-    const { keyword, kategori, tahun_terbit } = req.query;
-  
-    try {
-      const result = await pool.query(
-        `SELECT * FROM cari_buku($1::TEXT, $2::VARCHAR, $3::INT)`,
-        [
-          keyword || null,
-          kategori || null,
-          tahun_terbit ? parseInt(tahun_terbit) : null
-        ]
-      );
-      res.json({ data: result.rows });
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-});  
+  const { keyword, kategori, tahun_terbit } = req.query;
 
+  try {
+    const result = await pool.query(
+      `SELECT * FROM cari_buku($1::TEXT, $2::VARCHAR, $3::INT)`,
+      [
+        keyword || null,
+        kategori || null,
+        tahun_terbit ? parseInt(tahun_terbit) : null,
+      ]
+    );
+    res.json({ data: result.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Pembelian Buku
 app.post('/api/pembelian-buku', async (req, res) => {
-  const {
-    supplier_id,
-    pegawai_id,
-    buku_ids,
-    kuantitas,
-    subtotals,
-    harga_belis,
-  } = req.body;
+  const { supplier_id, pegawai_id, buku_ids, kuantitas, harga_belis } =
+    req.body;
 
   if (
     !supplier_id ||
     !pegawai_id ||
     !Array.isArray(buku_ids) ||
     !Array.isArray(kuantitas) ||
-    !Array.isArray(subtotals) ||
     !Array.isArray(harga_belis)
   ) {
     return res
@@ -136,7 +125,7 @@ app.post('/api/pembelian-buku', async (req, res) => {
   }
 
   if (
-    ![kuantitas.length, subtotals.length, harga_belis.length].every(
+    ![kuantitas.length, harga_belis.length].every(
       (len) => len === buku_ids.length
     )
   ) {
@@ -147,8 +136,8 @@ app.post('/api/pembelian-buku', async (req, res) => {
 
   try {
     await pool.query(
-      'CALL pembelian_buku($1, $2, $3::CHAR(8)[], $4::INT[], $5::DECIMAL(10,2)[], $6::DECIMAL(10,2)[])',
-      [supplier_id, pegawai_id, buku_ids, kuantitas, subtotals, harga_belis]
+      'CALL pembelian_buku($1, $2, $3::CHAR(8)[], $4::INT[], $5::DECIMAL(10,2)[])',
+      [supplier_id, pegawai_id, buku_ids, kuantitas, harga_belis]
     );
     res.status(201).json({ data: 'Pembelian berhasil disimpan.' });
   } catch (err) {
@@ -157,13 +146,9 @@ app.post('/api/pembelian-buku', async (req, res) => {
   }
 });
 
-
 // Get Pelanggan by No Telp
-app.get('/api/pelanggan', async (req, res) => {
-  const { no_telp } = req.query;
-  if (!no_telp) {
-    return res.status(400).json({ error: 'Nomor telepon harus diisi.' });
-  }
+app.get('/api/pelanggan/phone/:no_telp', async (req, res) => {
+  const { no_telp } = req.params;
   try {
     const result = await pool.query(
       'SELECT * FROM pelanggan p JOIN membership m ON m.pelanggan_id = p.pelanggan_id WHERE m.no_telp = $1',
@@ -175,6 +160,19 @@ app.get('/api/pelanggan', async (req, res) => {
     res.json({ data: result.rows[0] });
   } catch (err) {
     console.error('Error fetching pelanggan:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/suppliers/:supplier_id/books', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT DISTINCT(b.buku_id), b.judul FROM Buku b JOIN Detail_Pembelian dpb ON b.buku_id = dpb.buku_id JOIN Pembelian pb ON pb.pembelian_id = dpb.pembelian_id JOIN Supplier s ON pb.supplier_id = s.supplier_id WHERE s.supplier_id = $1',
+      [req.params.supplier_id]
+    );
+    res.json({ data: result.rows });
+  } catch (err) {
+    console.error('Error fetching supplier books:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -269,6 +267,26 @@ app.put('/api/membership/update', async (req, res) => {
   }
 });
 
+app.get('/api/supplier', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM supplier');
+    res.json({ data: result.rows });
+  } catch (err) {
+    console.error('Error fetching suppliers:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/kategori', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM kategori');
+    res.json({ data: result.rows });
+  } catch (err) {
+    console.error('Error fetching kategori:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Endpoint: Laporan Buku Terlaris
 app.get('/api/laporan/terlaris', async (req, res) => {
   try {
@@ -287,7 +305,9 @@ app.get('/api/laporan/tren-kategori', async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Gagal mengambil tren penjualan per kategori' });
+    res
+      .status(500)
+      .json({ error: 'Gagal mengambil tren penjualan per kategori' });
   }
 });
 

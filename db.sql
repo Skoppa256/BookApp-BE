@@ -160,6 +160,7 @@ INSERT INTO urutan_id VALUES
 ('Pembelian', 0),
 ('Penjualan', 0);
 
+
 -- Fungsi untuk membuat ID otomatis
 CREATE OR REPLACE FUNCTION buat_id_otomatis(prefix TEXT, tbl TEXT, lebar INT)
 RETURNS TEXT AS $$
@@ -188,7 +189,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trg_pegawai_id
+CREATE OR REPLACE TRIGGER trg_pegawai_id
 BEFORE INSERT ON Pegawai
 FOR EACH ROW
 EXECUTE FUNCTION before_insert_pegawai();
@@ -204,7 +205,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trg_pelanggan_id
+CREATE OR REPLACE TRIGGER trg_pelanggan_id
 BEFORE INSERT ON Pelanggan
 FOR EACH ROW
 EXECUTE FUNCTION before_insert_pelanggan();
@@ -220,7 +221,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trg_membership_id
+CREATE OR REPLACE TRIGGER trg_membership_id
 BEFORE INSERT ON Membership
 FOR EACH ROW
 EXECUTE FUNCTION before_insert_membership();
@@ -236,7 +237,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trg_supplier_id
+CREATE OR REPLACE TRIGGER trg_supplier_id
 BEFORE INSERT ON Supplier
 FOR EACH ROW
 EXECUTE FUNCTION before_insert_supplier();
@@ -252,7 +253,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trg_penulis_id
+CREATE OR REPLACE TRIGGER trg_penulis_id
 BEFORE INSERT ON Penulis
 FOR EACH ROW
 EXECUTE FUNCTION before_insert_penulis();
@@ -268,7 +269,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trg_penerbit_id
+CREATE OR REPLACE TRIGGER trg_penerbit_id
 BEFORE INSERT ON Penerbit
 FOR EACH ROW
 EXECUTE FUNCTION before_insert_penerbit();
@@ -284,7 +285,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trg_kategori_id
+CREATE OR REPLACE TRIGGER trg_kategori_id
 BEFORE INSERT ON Kategori
 FOR EACH ROW
 EXECUTE FUNCTION before_insert_kategori();
@@ -300,7 +301,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trg_buku_id
+CREATE OR REPLACE TRIGGER trg_buku_id
 BEFORE INSERT ON Buku
 FOR EACH ROW
 EXECUTE FUNCTION before_insert_buku();
@@ -316,7 +317,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trg_pembelian_id
+CREATE OR REPLACE TRIGGER trg_pembelian_id
 BEFORE INSERT ON Pembelian
 FOR EACH ROW
 EXECUTE FUNCTION before_insert_pembelian();
@@ -332,7 +333,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trg_penjualan_id
+CREATE OR REPLACE TRIGGER trg_penjualan_id
 BEFORE INSERT ON Penjualan
 FOR EACH ROW
 EXECUTE FUNCTION before_insert_penjualan();
@@ -346,29 +347,31 @@ EXECUTE FUNCTION before_insert_penjualan();
 -- Mengidentifikasi buku yang perlu dibeli (stok sedikit)
 CREATE OR REPLACE FUNCTION rekomendasi_pembelian(threshold INT)
 RETURNS TABLE(
-	buku_id CHAR(8),
-	judul VARCHAR(100),
-	jumlah_stok INT,
-	nama_supplier VARCHAR(100)
+  buku_id CHAR(8),
+  judul VARCHAR(100),
+  jumlah_stok INT,
+  nama_supplier TEXT
 ) 
 AS $$
 BEGIN
-	RETURN QUERY
-	SELECT 
-		b.buku_id,
-		b.judul,
-		b.jumlah_stok,
-		s.nama
-	FROM Buku b 
-	JOIN Detail_Pembelian d ON b.buku_id = d.buku_id
-	JOIN Pembelian p ON d.pembelian_id = p.pembelian_id
-	JOIN Supplier s ON s.supplier_id = p.supplier_id
-	WHERE b.jumlah_stok < threshold
-	GROUP BY b.buku_id, b.judul, b.jumlah_stok, s.nama
-	ORDER BY b.jumlah_stok ASC;
+  RETURN QUERY
+  SELECT 
+    b.buku_id,
+    b.judul,
+    b.jumlah_stok,
+    STRING_AGG(DISTINCT s.nama, ', ') AS nama_supplier
+  FROM Buku b 
+  LEFT JOIN Detail_Pembelian d ON b.buku_id = d.buku_id
+  LEFT JOIN Pembelian p ON d.pembelian_id = p.pembelian_id
+  LEFT JOIN Supplier s ON s.supplier_id = p.supplier_id
+  WHERE b.jumlah_stok < threshold
+  GROUP BY b.buku_id, b.judul, b.jumlah_stok
+  ORDER BY b.jumlah_stok ASC;
 END;
-$$
-LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
+
+SELECT * FROM Buku b
+  LEFT JOIN Detail_Pembelian d ON b.buku_id = d.buku_id
 
 -- Proses Pembelian
 CREATE OR REPLACE PROCEDURE pembelian_buku(
@@ -376,7 +379,6 @@ CREATE OR REPLACE PROCEDURE pembelian_buku(
 	IN p_pegawai_id CHAR(8),
 	IN p_buku_ids CHAR(8)[],
 	IN p_kuantitas INT[],
-	IN p_subtotals DECIMAL(10, 2)[],
 	IN p_harga_belis DECIMAL(10, 2)[]
 )
 LANGUAGE plpgsql
@@ -413,17 +415,13 @@ BEGIN
 			RAISE EXCEPTION 'Kuantitas harus > 0 untuk buku %', p_buku_ids[i];
 		END IF;
 
-		IF p_subtotals[i] <= 0 THEN
-			RAISE EXCEPTION 'Subtotal harus > 0 untuk buku %', p_buku_ids[i];
-		END IF;
-
 		IF p_harga_belis[i] <= 0 THEN
 			RAISE EXCEPTION 'Harga beli harus > 0 untuk buku %', p_buku_ids[i];
 		END IF;
 
 		-- Insert detail pembelian
 		INSERT INTO Detail_Pembelian(pembelian_id, buku_id, kuantitas, subtotal)
-		VALUES(new_pembelian_id, p_buku_ids[i], p_kuantitas[i], p_subtotals[i]);
+		VALUES(new_pembelian_id, p_buku_ids[i], p_kuantitas[i], p_harga_belis[i] * p_kuantitas[i]);
 
 		-- Update harga beli buku
 		UPDATE Buku
@@ -446,7 +444,7 @@ END;
 $$ 
 LANGUAGE plpgsql;
 
-CREATE TRIGGER trg_tambah_stok
+CREATE OR REPLACE TRIGGER trg_tambah_stok
 AFTER INSERT ON Detail_Pembelian
 FOR EACH ROW
 EXECUTE FUNCTION tambah_stok();
@@ -493,12 +491,11 @@ BEGIN
             LOWER(b.judul) LIKE LOWER('%' || p_keyword || '%') OR
             LOWER(p.nama_penulis) LIKE LOWER('%' || p_keyword || '%')
         )) AND
-        (p_kategori IS NULL OR LOWER(k.nama) LIKE LOWER('%' || p_kategori || '%')) AND
+        (p_kategori IS NULL OR LOWER(k.nama) = LOWER(p_kategori)) AND
         (p_tahun_terbit IS NULL OR b.tahun_terbit = p_tahun_terbit)
     ORDER BY b.judul;
 END;
 $$ LANGUAGE plpgsql;
-
 
 -- Proses Penjualan
 -- CREATE OR REPLACE PROCEDURE penjualan_buku(
@@ -664,7 +661,7 @@ END;
 $$ 
 LANGUAGE plpgsql;
 
-CREATE TRIGGER trg_kurangi_stok
+CREATE OR REPLACE TRIGGER trg_kurangi_stok
 AFTER INSERT ON Detail_Penjualan
 FOR EACH ROW
 EXECUTE FUNCTION kurangi_stok();
@@ -807,7 +804,6 @@ CREATE OR REPLACE PROCEDURE tambah_buku_baru(
     IN p_tahun_terbit INT,
     IN p_jumlah_halaman INT,
     IN p_harga_jual DECIMAL(10,2),
-    IN p_jumlah_stok INT
 )
 LANGUAGE plpgsql
 AS $$
@@ -829,7 +825,7 @@ BEGIN
     END IF;
 
     INSERT INTO Buku(buku_id, penerbit_id, kategori_id, isbn, judul, tahun_terbit, jumlah_halaman, harga_beli, harga_jual, jumlah_stok)
-    VALUES (p_buku_id, p_penerbit_id, p_kategori_id, p_isbn, p_judul, p_tahun_terbit, p_jumlah_halaman, 0, p_harga_jual, p_jumlah_stok);
+    VALUES (p_buku_id, p_penerbit_id, p_kategori_id, p_isbn, p_judul, p_tahun_terbit, p_jumlah_halaman, 0, p_harga_jual, 0);
 
     INSERT INTO Buku_Penulis(buku_id, penulis_id)
     VALUES (p_buku_id, p_penulis_id);
