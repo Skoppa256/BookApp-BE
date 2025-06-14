@@ -269,6 +269,39 @@ app.put('/api/membership/update', async (req, res) => {
   }
 });
 
+// Endpoint: Laporan Buku Terlaris
+app.get('/api/laporan/terlaris', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM laporan_buku_terlaris');
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Gagal mengambil data buku terlaris' });
+  }
+});
+
+// Endpoint: Tren Penjualan per Kategori
+app.get('/api/laporan/tren-kategori', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM tren_penjualan_kategori');
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Gagal mengambil tren penjualan per kategori' });
+  }
+});
+
+// Endpoint: Laporan Keuangan Bulanan
+app.get('/api/laporan/keuangan-bulanan', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM laporan_keuangan_bulanan');
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Gagal mengambil laporan keuangan bulanan' });
+  }
+});
+
 // Start server
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
