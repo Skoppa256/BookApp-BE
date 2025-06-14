@@ -568,9 +568,8 @@ $$ LANGUAGE plpgsql;
 -- $$;
 
 CREATE OR REPLACE PROCEDURE penjualan_buku(
-    IN p_penjualan_id CHAR(10),
     IN p_metode_pembayaran VARCHAR(20),
-    IN p_pelanggan_id CHAR(8),
+    IN p_pelanggan_no_telp VARCHAR(20),
     IN p_pegawai_id CHAR(8),
     IN p_buku_ids CHAR(8)[],
     IN p_kuantitas INT[]
@@ -580,14 +579,15 @@ AS $$
 DECLARE
     i INT;
     array_len INT := array_length(p_buku_ids, 1);
+	v_pelanggan_id CHAR(8);
     v_harga_jual DECIMAL(10, 2);
     v_subtotal DECIMAL(10, 2);
     v_diskon INT := 0;
     v_tipe_membership VARCHAR(20);
 BEGIN
     -- Validasi dasar
-    IF NOT EXISTS (SELECT 1 FROM Pelanggan WHERE pelanggan_id = p_pelanggan_id) THEN
-        RAISE EXCEPTION 'Pelanggan ID % tidak ditemukan', p_pelanggan_id;
+    IF NOT EXISTS (SELECT 1 FROM Membership WHERE no_telp = p_pelanggan_no_telp) THEN
+        RAISE EXCEPTION 'Pelanggan tidak ditemukan';
     END IF;
 
     IF NOT EXISTS (SELECT 1 FROM Pegawai WHERE pegawai_id = p_pegawai_id) THEN
@@ -598,14 +598,14 @@ BEGIN
         RAISE EXCEPTION 'Array buku tidak boleh kosong';
     END IF;
 
-    IF EXISTS (SELECT 1 FROM Penjualan WHERE penjualan_id = p_penjualan_id) THEN
-        RAISE EXCEPTION 'Penjualan ID % sudah ada.', p_penjualan_id;
-    END IF;
+	SELECT pelanggan_id INTO v_pelanggan_id
+	FROM Membership
+	WHERE no_telp = p_pelanggan_no_telp;
 
     -- Dapatkan tipe membership dan diskon
     SELECT tipe INTO v_tipe_membership
     FROM Membership
-    WHERE pelanggan_id = p_pelanggan_id AND tanggal_kadaluwarsa > NOW()
+    WHERE pelanggan_id = v_pelanggan_id AND tanggal_kadaluwarsa > NOW()
     ORDER BY tanggal_kadaluwarsa DESC
     LIMIT 1;
 
@@ -618,8 +618,8 @@ BEGIN
     END IF;
 
     -- Masukkan header penjualan
-    INSERT INTO Penjualan(penjualan_id, tanggal_penjualan, metode_pembayaran, diskon, pelanggan_id, pegawai_id)
-    VALUES (p_penjualan_id, NOW(), p_metode_pembayaran, v_diskon, p_pelanggan_id, p_pegawai_id);
+    INSERT INTO Penjualan(tanggal_penjualan, metode_pembayaran, diskon, pelanggan_id, pegawai_id)
+    VALUES (NOW(), p_metode_pembayaran, v_diskon, v_pelanggan_id, p_pegawai_id);
 
     -- Loop untuk setiap buku
     FOR i IN 1..array_len LOOP
