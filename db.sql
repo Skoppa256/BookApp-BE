@@ -370,9 +370,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-SELECT * FROM Buku b
-  LEFT JOIN Detail_Pembelian d ON b.buku_id = d.buku_id
-
 -- Proses Pembelian
 CREATE OR REPLACE PROCEDURE pembelian_buku(
 	IN p_supplier_id CHAR(8),
@@ -1003,13 +1000,13 @@ INSERT INTO Pembelian (tanggal_pembelian, supplier_id, pegawai_id) VALUES
 -- Detail_Pembelian
 INSERT INTO Detail_Pembelian (buku_id, pembelian_id, kuantitas, subtotal) VALUES
 -- Use the generated pembelian_id values (e.g., PB0000001 etc.)
-('BK000001', 'PB0000001', 10, 350000.00),
-('BK000002', 'PB0000002', 5, 200000.00),
-('BK000003', 'PB0000003', 8, 360000.00),
-('BK000004', 'PB0000004', 12, 576000.00),
-('BK000005', 'PB0000005', 6, 252000.00),
-('BK000001', 'PB0000006', 10, 350000.00),
-('BK000001', 'PB0000007', 5, 175000.00);
+('BK000001', 'PB00000001', 10, 350000.00),
+('BK000002', 'PB00000002', 5, 200000.00),
+('BK000003', 'PB00000003', 8, 360000.00),
+('BK000004', 'PB00000004', 12, 576000.00),
+('BK000005', 'PB00000005', 6, 252000.00),
+('BK000001', 'PB00000006', 10, 350000.00),
+('BK000001', 'PB00000007', 5, 175000.00);
 
 -- Penjualan
 INSERT INTO Penjualan (pelanggan_id, pegawai_id, tanggal_penjualan, metode_pembayaran, diskon) VALUES
@@ -1021,8 +1018,8 @@ INSERT INTO Penjualan (pelanggan_id, pegawai_id, tanggal_penjualan, metode_pemba
 
 -- Detail_Penjualan
 INSERT INTO Detail_Penjualan (buku_id, penjualan_id, kuantitas, subtotal) VALUES
-('BK000001', 'PJ0000001', 2, 90000.00),  
-('BK000002', 'PJ0000002', 1, 50875.00), 
-('BK000003', 'PJ0000003', 3, 171000.00),
-('BK000004', 'PJ0000004', 1, 60125.00), 
-('BK000005', 'PJ0000005', 2, 104400.00);
+('BK000001', 'PJ00000001', 2, 90000.00),  
+('BK000002', 'PJ00000002', 1, 50875.00), 
+('BK000003', 'PJ00000003', 3, 171000.00),
+('BK000004', 'PJ00000004', 1, 60125.00), 
+('BK000005', 'PJ00000005', 2, 104400.00);

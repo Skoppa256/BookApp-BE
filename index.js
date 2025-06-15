@@ -101,6 +101,7 @@ app.get('/api/pembelian/:id', async (req, res) => {
     const buku = await pool.query(
       `
         SELECT 
+            b.buku_id,
             b.judul, 
             STRING_AGG(pen.nama_penulis, ', ') AS penulis,
             p.nama AS nama_penerbit, 
@@ -120,7 +121,7 @@ app.get('/api/pembelian/:id', async (req, res) => {
         JOIN penulis pen ON pen.penulis_id = bp.penulis_id
         WHERE det.pembelian_id = $1
         GROUP BY 
-            b.judul, p.nama, k.nama, b.isbn, b.tahun_terbit, 
+            b.buku_id, b.judul, p.nama, k.nama, b.isbn, b.tahun_terbit, 
             b.jumlah_halaman, b.harga_beli, b.harga_jual, 
             det.kuantitas, det.subtotal
       `,
@@ -137,9 +138,11 @@ app.get('/api/pembelian/:id', async (req, res) => {
     );
 
     res.json({
-      ...detail.rows[0],
-      total: totalResult.rows[0].total || 0,
-      buku: buku.rows,
+      data: {
+        ...detail.rows[0],
+        total: totalResult.rows[0].total || 0,
+        buku: buku.rows,
+      },
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -165,6 +168,7 @@ app.get('/api/penjualan/:penjualan_id', async (req, res) => {
     const buku = await pool.query(
       `
         SELECT 
+            b.buku_id,
             b.judul, 
             STRING_AGG(pen.nama_penulis, ', ') AS penulis,
             p.nama AS nama_penerbit, 
@@ -184,7 +188,7 @@ app.get('/api/penjualan/:penjualan_id', async (req, res) => {
         JOIN penulis pen ON pen.penulis_id = bp.penulis_id
         WHERE det.penjualan_id = $1
         GROUP BY 
-            b.judul, p.nama, k.nama, b.isbn, b.tahun_terbit, 
+            b.buku_id, b.judul, p.nama, k.nama, b.isbn, b.tahun_terbit, 
             b.jumlah_halaman, b.harga_beli, b.harga_jual, 
             det.kuantitas, det.subtotal
       `,
@@ -201,9 +205,11 @@ app.get('/api/penjualan/:penjualan_id', async (req, res) => {
     );
 
     res.json({
-      ...detail.rows[0],
-      total: totalResult.rows[0].total || 0,
-      buku: buku.rows,
+      data: {
+        ...detail.rows[0],
+        total: totalResult.rows[0].total || 0,
+        buku: buku.rows,
+      },
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -275,13 +281,15 @@ app.get('/api/pegawai/:pegawai_id', async (req, res) => {
     );
 
     res.json({
-      detail: detailPegawai.rows,
-      pembelian: daftarPembelian.rows,
-      kuantitas_pembelian: rekapPembelian.rows[0].kuantitas,
-      total_pembelian: rekapPembelian.rows[0].total,
-      penjualan: daftarPenjualan.rows,
-      kuantitas_penjualan: rekapPenjualan.rows[0].kuantitas,
-      total_penjualan: rekapPenjualan.rows[0].total,
+      data: {
+        detail: detailPegawai.rows,
+        pembelian: daftarPembelian.rows,
+        kuantitas_pembelian: rekapPembelian.rows[0].kuantitas,
+        total_pembelian: rekapPembelian.rows[0].total,
+        penjualan: daftarPenjualan.rows,
+        kuantitas_penjualan: rekapPenjualan.rows[0].kuantitas,
+        total_penjualan: rekapPenjualan.rows[0].total,
+      },
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -289,19 +297,23 @@ app.get('/api/pegawai/:pegawai_id', async (req, res) => {
 });
 
 // Detail Pelanggan by ID
-app.get('/api/pelanggan/:pelanggan_id', async (req, res) => {
-  const { pelanggan_id } = req.params;
+app.get('/api/pelanggan/:no_telp', async (req, res) => {
+  const { no_telp } = req.params;
 
   try {
     const detailPelanggan = await pool.query(
       `
-        SELECT p.nama, m.tipe, m.no_telp, m.alamat, m.tanggal_pembuatan, m.tanggal_kadaluwarsa
+        SELECT *
         FROM pelanggan p
         JOIN membership m ON (p.pelanggan_id = m.pelanggan_id)
-        WHERE p.pelanggan_id = $1
+        WHERE m.no_telp = $1
         `,
-      [pelanggan_id]
+      [no_telp]
     );
+
+    if (detailPelanggan.rows.length === 0) {
+      return res.status(404).json({ error: 'Pelanggan tidak ditemukan.' });
+    }
 
     const daftarPenjualan = await pool.query(
       `
@@ -312,10 +324,11 @@ app.get('/api/pelanggan/:pelanggan_id', async (req, res) => {
         JOIN penjualan p ON (p.penjualan_id = det.penjualan_id)
         JOIN pegawai peg ON (p.pegawai_id = peg.pegawai_id)
         JOIN pelanggan pel ON (p.pelanggan_id = pel.pelanggan_id)
-        WHERE p.pelanggan_id = $1
+        JOIN membership m ON (pel.pelanggan_id = m.pelanggan_id)
+        WHERE m.no_telp = $1
         ORDER BY p.tanggal_penjualan DESC
       `,
-      [pelanggan_id]
+      [no_telp]
     );
 
     const rekapPenjualan = await pool.query(
@@ -325,16 +338,20 @@ app.get('/api/pelanggan/:pelanggan_id', async (req, res) => {
             FROM detail_penjualan
             GROUP BY penjualan_id) det 
         JOIN penjualan p ON (p.penjualan_id = det.penjualan_id)
-        WHERE p.pelanggan_id = $1
+        JOIN pelanggan pel ON (p.pelanggan_id = pel.pelanggan_id)
+        JOIN membership m ON (pel.pelanggan_id = m.pelanggan_id)
+        WHERE m.no_telp = $1
       `,
-      [pelanggan_id]
+      [no_telp]
     );
 
     res.json({
-      detail: detailPelanggan.rows,
-      penjualan: daftarPenjualan.rows,
-      kuantitas_penjualan: rekapPenjualan.rows[0].kuantitas,
-      total_penjualan: rekapPenjualan.rows[0].total,
+      data: {
+        ...detailPelanggan.rows[0],
+        penjualan: daftarPenjualan.rows,
+        kuantitas_penjualan: rekapPenjualan.rows[0].kuantitas,
+        total_penjualan: rekapPenjualan.rows[0].total,
+      },
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -349,6 +366,7 @@ app.get('/api/buku/:buku_id', async (req, res) => {
     const detailBuku = await pool.query(
       `
         SELECT 
+            b.buku_id,
             b.judul,
             STRING_AGG(pen.nama_penulis, ', ') AS penulis,
             p.nama AS nama_penerbit, 
@@ -365,7 +383,7 @@ app.get('/api/buku/:buku_id', async (req, res) => {
         JOIN penulis pen ON pen.penulis_id = bp.penulis_id
         WHERE b.buku_id = $1
         GROUP BY 
-            b.judul, p.nama, k.nama, b.isbn, b.tahun_terbit, 
+            b.buku_id, b.judul, p.nama, k.nama, b.isbn, b.tahun_terbit, 
             b.jumlah_halaman, b.harga_beli, b.harga_jual
         `,
       [buku_id]
@@ -398,9 +416,11 @@ app.get('/api/buku/:buku_id', async (req, res) => {
     );
 
     res.json({
-      detail: detailBuku.rows,
-      penjualan: daftarPenjualan.rows,
-      pembelian: daftarPembelian.rows,
+      data: {
+        ...detailBuku.rows[0],
+        penjualan: daftarPenjualan.rows,
+        pembelian: daftarPembelian.rows,
+      },
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -680,46 +700,53 @@ app.get('/api/laporan/keuangan-bulanan', async (req, res) => {
   }
 });
 
-
 // Tambah Buku
 app.post('/api/tambah_buku', async (req, res) => {
-    const {
-      kategori_id,
-      isbn,
-      judul,
-      tahun_terbit,
-      jumlah_halaman,
-  
-      pegawai_id,
-      kuantitas,
-      harga_beli,
-  
-      penerbit_id,
-      penulis_id,
-  
-      tul_nama_penulis,
-      pen_nama,
-      pen_alamat,
-      pen_email,
-      pen_no_telp,
-  
-      s_nama,
-      s_no_telp,
-      s_alamat,
-  
-      supplier_id
-    } = req.body;
-  
-    // Basic validation
-    if (
-      !kategori_id || !isbn || !judul || !tahun_terbit || !jumlah_halaman ||
-      !pegawai_id || !kuantitas || !harga_beli
-    ) {
-      return res.status(400).json({ error: 'Data buku, pegawai, kuantitas, dan harga beli wajib diisi.' });
-    }
-  
-    try {
-      const query = `
+  const {
+    kategori_id,
+    isbn,
+    judul,
+    tahun_terbit,
+    jumlah_halaman,
+
+    pegawai_id,
+    kuantitas,
+    harga_beli,
+
+    penerbit_id,
+    penulis_id,
+
+    tul_nama_penulis,
+    pen_nama,
+    pen_alamat,
+    pen_email,
+    pen_no_telp,
+
+    s_nama,
+    s_no_telp,
+    s_alamat,
+
+    supplier_id,
+  } = req.body;
+
+  // Basic validation
+  if (
+    !kategori_id ||
+    !isbn ||
+    !judul ||
+    !tahun_terbit ||
+    !jumlah_halaman ||
+    !pegawai_id ||
+    !kuantitas ||
+    !harga_beli
+  ) {
+    return res.status(400).json({
+      error: 'Data buku, pegawai, kuantitas, dan harga beli wajib diisi.',
+    });
+  }
+
+  try {
+    const query = `
         CALL tambah_buku_baru(
           $1, $2, $3, $4, $5,
           $6, $7, $8,
@@ -729,43 +756,46 @@ app.post('/api/tambah_buku', async (req, res) => {
           $19
         )
       `;
-  
-      const values = [
-        kategori_id,
-        isbn,
-        judul,
-        tahun_terbit,
-        jumlah_halaman,
-  
-        pegawai_id,
-        kuantitas,
-        harga_beli,
-  
-        penerbit_id,
-        penulis_id,
-  
-        tul_nama_penulis,
-        pen_nama,
-        pen_alamat,
-        pen_email,
-        pen_no_telp,
-  
-        s_nama,
-        s_no_telp,
-        s_alamat,
-  
-        supplier_id
-      ];
-  
-      await pool.query(query, values);
-  
-      res.status(201).json({ message: 'Buku baru berhasil ditambahkan beserta pembelian awal.' });
-    } catch (err) {
-      console.error('Error in tambah_buku_baru:', err);
-      res.status(500).json({ error: 'Gagal menambahkan buku.', detail: err.message });
-    }
-});
 
+    const values = [
+      kategori_id,
+      isbn,
+      judul,
+      tahun_terbit,
+      jumlah_halaman,
+
+      pegawai_id,
+      kuantitas,
+      harga_beli,
+
+      penerbit_id,
+      penulis_id,
+
+      tul_nama_penulis,
+      pen_nama,
+      pen_alamat,
+      pen_email,
+      pen_no_telp,
+
+      s_nama,
+      s_no_telp,
+      s_alamat,
+
+      supplier_id,
+    ];
+
+    await pool.query(query, values);
+
+    res.status(201).json({
+      message: 'Buku baru berhasil ditambahkan beserta pembelian awal.',
+    });
+  } catch (err) {
+    console.error('Error in tambah_buku_baru:', err);
+    res
+      .status(500)
+      .json({ error: 'Gagal menambahkan buku.', detail: err.message });
+  }
+});
 
 // Start server
 app.listen(port, () => {
