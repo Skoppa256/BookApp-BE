@@ -311,7 +311,7 @@ CREATE OR REPLACE FUNCTION before_insert_pembelian()
 RETURNS TRIGGER AS $$
 BEGIN
     IF NEW.pembelian_id IS NULL THEN
-        NEW.pembelian_id := buat_id_otomatis('PB', 'Pembelian', 7);
+        NEW.pembelian_id := buat_id_otomatis('PB', 'Pembelian', 8);
     END IF;
     RETURN NEW;
 END;
@@ -327,7 +327,7 @@ CREATE OR REPLACE FUNCTION before_insert_penjualan()
 RETURNS TRIGGER AS $$
 BEGIN
     IF NEW.penjualan_id IS NULL THEN
-        NEW.penjualan_id := buat_id_otomatis('PJ', 'Penjualan', 7);
+        NEW.penjualan_id := buat_id_otomatis('PJ', 'Penjualan', 8);
     END IF;
     RETURN NEW;
 END;
@@ -776,22 +776,25 @@ SELECT
     COALESCE(pendapatan.total_pendapatan, 0) - COALESCE(biaya.total_biaya, 0) AS laba_kotor
 FROM
     (
-        SELECT DATE_TRUNC('month', p.tanggal_penjualan) AS bulan,
-               SUM(dp.subtotal) AS total_pendapatan
+        SELECT 
+            MAKE_DATE(EXTRACT(YEAR FROM p.tanggal_penjualan)::int, EXTRACT(MONTH FROM p.tanggal_penjualan)::int, 3) AS bulan,
+            SUM(dp.subtotal) AS total_pendapatan
         FROM Penjualan p
         JOIN Detail_Penjualan dp ON p.penjualan_id = dp.penjualan_id
         GROUP BY bulan
     ) pendapatan
 FULL OUTER JOIN
     (
-        SELECT DATE_TRUNC('month', pb.tanggal_pembelian) AS bulan,
-               SUM(dpb.subtotal) AS total_biaya
+        SELECT 
+            MAKE_DATE(EXTRACT(YEAR FROM pb.tanggal_pembelian)::int, EXTRACT(MONTH FROM pb.tanggal_pembelian)::int, 3) AS bulan,
+            SUM(dpb.subtotal) AS total_biaya
         FROM Pembelian pb
         JOIN Detail_Pembelian dpb ON pb.pembelian_id = dpb.pembelian_id
         GROUP BY bulan
     ) biaya
 ON pendapatan.bulan = biaya.bulan
 ORDER BY bulan;
+
 
 -- 2.2.5 Integrasi Buku-Penulis-Penerbit-Kategori
 CREATE OR REPLACE PROCEDURE tambah_buku_baru(

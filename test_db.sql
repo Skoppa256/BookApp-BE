@@ -210,3 +210,4 @@ SELECT * FROM Pembelian p
 JOIN Detail_Pembelian dpb ON p.pembelian_id = dpb.pembelian_id
 WHERE dpb.pembelian_id = 'PB0000009'
 
+
