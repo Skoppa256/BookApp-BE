@@ -22,7 +22,6 @@ CALL pembelian_buku(
 	'PG000001',
 	ARRAY['BK000002', 'BK000001'],
 	ARRAY[100, 100],
-	ARRAY[400000.00, 175000.00],
 	ARRAY[40000.00, 35000.00]
 );
 
@@ -87,9 +86,29 @@ SELECT * FROM laporan_keuangan_bulanan;
 
 -- Procedure tambah_buku_baru
 CALL tambah_buku_baru(
-    'BK000006', '9780143111580', 'tes buku',
-    'KT002', 'PB0002', 'PN0002',
-    2023, 300, 70000.00, 50
+    'KT002', 
+	'9780143111584', 
+	'tes buku 4',
+	2023, 
+	300, 
+	
+	'PG000001', 
+	5,
+	50000.00,
+	
+	'PB0001',
+	'PN0003',
+	
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	
+	'SP000002'
 );
 
 -- Procedure insert membership

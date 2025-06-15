@@ -422,11 +422,6 @@ BEGIN
 		-- Insert detail pembelian
 		INSERT INTO Detail_Pembelian(pembelian_id, buku_id, kuantitas, subtotal)
 		VALUES(new_pembelian_id, p_buku_ids[i], p_kuantitas[i], p_harga_belis[i] * p_kuantitas[i]);
-
-		-- Update harga beli buku
-		UPDATE Buku
-		SET harga_beli = p_harga_belis[i]
-		WHERE buku_id = p_buku_ids[i];
 	END LOOP;
 END;
 $$;
@@ -434,15 +429,29 @@ $$;
 -- Update stok setelah Pembelian
 CREATE OR REPLACE FUNCTION tambah_stok()
 RETURNS TRIGGER AS $$
+DECLARE
+	new_harga_beli DECIMAL(10, 2);
 BEGIN
+	-- Hitung harga beli per unit dari subtotal dan kuantitas
+	IF NEW.kuantitas > 0 THEN
+		new_harga_beli := NEW.subtotal / NEW.kuantitas;
+	ELSE
+		RAISE EXCEPTION 'Kuantitas tidak boleh nol dalam trigger tambah_stok()';
+	END IF;
+
+	-- Update semua field terkait buku
 	UPDATE Buku
-	SET jumlah_stok = jumlah_stok + NEW.kuantitas
+	SET 
+		jumlah_stok = jumlah_stok + NEW.kuantitas,
+		harga_beli = new_harga_beli,
+		harga_jual = ROUND(new_harga_beli * 1.5, 2)
 	WHERE buku_id = NEW.buku_id;
 
 	RETURN NEW;
 END;
 $$ 
 LANGUAGE plpgsql;
+
 
 CREATE OR REPLACE TRIGGER trg_tambah_stok
 AFTER INSERT ON Detail_Pembelian
@@ -798,40 +807,101 @@ ORDER BY bulan;
 
 -- 2.2.5 Integrasi Buku-Penulis-Penerbit-Kategori
 CREATE OR REPLACE PROCEDURE tambah_buku_baru(
-    IN p_buku_id CHAR(8),
-    IN p_isbn CHAR(13),
-    IN p_judul VARCHAR(100),
+	-- Tabel Buku
     IN p_kategori_id CHAR(5),
-    IN p_penerbit_id CHAR(6),
-    IN p_penulis_id CHAR(6),
+	IN p_isbn CHAR(13),
+    IN p_judul VARCHAR(100),
     IN p_tahun_terbit INT,
-    IN p_jumlah_halaman INT,
-    IN p_harga_jual DECIMAL(10,2),
+    IN p_jumlah_halaman INT,	
+	
+	-- Call pembelian_buku
+	IN p_pegawai_id CHAR(8),
+	IN p_kuantitas INT,
+	IN p_harga_beli DECIMAL(10, 2),
+	
+	IN p_penerbit_id CHAR(6) DEFAULT NULL,
+	IN p_penulis_id CHAR(6) DEFAULT NULL,
+	-- Penulis
+	IN tul_nama_penulis VARCHAR(100) DEFAULT NULL,
+	-- Penerbit
+	IN pen_nama VARCHAR(50) DEFAULT NULL,
+	IN pen_alamat VARCHAR(150) DEFAULT NULL,
+	IN pen_email VARCHAR(30) DEFAULT NULL,
+	IN pen_no_telp VARCHAR(20) DEFAULT NULL,
+	-- Supplier
+	IN s_nama VARCHAR(100) DEFAULT NULL,
+	IN s_no_telp VARCHAR(20) DEFAULT NULL,
+	IN s_alamat VARCHAR(150) DEFAULT NULL,
+	-- Call pembelian_buku
+	IN p_supplier_id CHAR(8) DEFAULT NULL
 )
 LANGUAGE plpgsql
 AS $$
+DECLARE
+	new_penerbit_id CHAR(6);
+	new_penulis_id CHAR(6);
+	new_supplier_id CHAR(8);
+	new_buku_id CHAR(8);
 BEGIN
+	-- CHECK NEEDED DATA
     IF EXISTS (SELECT 1 FROM Buku WHERE isbn = p_isbn) THEN
         RAISE EXCEPTION 'Buku dengan ISBN % sudah ada.', p_isbn;
-    END IF;
-
-    IF NOT EXISTS (SELECT 1 FROM Penulis WHERE penulis_id = p_penulis_id) THEN
-        RAISE EXCEPTION 'Penulis ID % tidak ditemukan', p_penulis_id;
-    END IF;
-
-    IF NOT EXISTS (SELECT 1 FROM Penerbit WHERE penerbit_id = p_penerbit_id) THEN
-        RAISE EXCEPTION 'Penerbit ID % tidak ditemukan', p_penerbit_id;
     END IF;
 
     IF NOT EXISTS (SELECT 1 FROM Kategori WHERE kategori_id = p_kategori_id) THEN
         RAISE EXCEPTION 'Kategori ID % tidak ditemukan', p_kategori_id;
     END IF;
+	
+	-- CHECK PENERBIT
+	IF p_penerbit_id IS NULL AND pen_nama IS NOT NULL AND pen_alamat IS NOT NULL AND pen_email IS NOT NULL AND pen_no_telp IS NOT NULL THEN
+		INSERT INTO Penerbit(nama, alamat, email, no_telp)
+		VALUES (pen_nama, pen_alamat, pen_email, pen_no_telp)
+		RETURNING penerbit_id INTO new_penerbit_id;
+	ELSIF p_penerbit_id IS NOT NULL THEN
+		new_penerbit_id := p_penerbit_id;
+	ELSE
+        RAISE EXCEPTION 'Data Penerbit Tidak Lengkap';
+	END IF;
 
-    INSERT INTO Buku(buku_id, penerbit_id, kategori_id, isbn, judul, tahun_terbit, jumlah_halaman, harga_beli, harga_jual, jumlah_stok)
-    VALUES (p_buku_id, p_penerbit_id, p_kategori_id, p_isbn, p_judul, p_tahun_terbit, p_jumlah_halaman, 0, p_harga_jual, 0);
+	-- CHECK PENULIS
+	IF p_penulis_id IS NULL AND tul_nama_penulis IS NOT NULL THEN
+		INSERT INTO Penulis(nama_penulis)
+		VALUES (tul_nama_penulis)
+		RETURNING penulis_id INTO new_penulis_id;
+	ELSIF p_penulis_id IS NOT NULL THEN
+		new_penulis_id := p_penulis_id;
+	ELSE
+		RAISE EXCEPTION 'Data Penulis Tidak Lengkap';
+	END IF;
+	
+	-- CHECK SUPPLIER
+	IF p_supplier_id IS NULL AND s_nama IS NOT NULL AND s_no_telp IS NOT NULL AND s_alamat IS NOT NULL THEN
+		INSERT INTO Supplier (nama, no_telp, alamat)
+		VALUES (s_nama, s_no_telp, s_alamat)
+		RETURNING supplier_id INTO new_supplier_id;
+	ELSIF p_supplier_id IS NOT NULL THEN
+		new_supplier_id := p_supplier_id;
+	ELSE
+		RAISE EXCEPTION 'Data Supplier Tidak Lengkap';
+	END IF;
 
+	-- INSERT BUKU
+    INSERT INTO Buku(penerbit_id, kategori_id, isbn, judul, tahun_terbit, jumlah_halaman, harga_beli, harga_jual, jumlah_stok)
+    VALUES (new_penerbit_id, p_kategori_id, p_isbn, p_judul, p_tahun_terbit, p_jumlah_halaman, 0, 0, 0)
+	RETURNING buku_id INTO new_buku_id;
+
+	-- INSERT PENULIS
     INSERT INTO Buku_Penulis(buku_id, penulis_id)
-    VALUES (p_buku_id, p_penulis_id);
+    VALUES (new_buku_id, new_penulis_id);
+	
+	-- CALL Pembelian Buku
+	CALL pembelian_buku(
+		new_supplier_id,
+		p_pegawai_id,
+		ARRAY[new_buku_id],
+		ARRAY[p_kuantitas],
+		ARRAY[p_harga_beli]
+	);
 END;
 $$;
 

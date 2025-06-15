@@ -681,6 +681,93 @@ app.get('/api/laporan/keuangan-bulanan', async (req, res) => {
   }
 });
 
+
+// Tambah Buku
+app.post('/api/tambah_buku', async (req, res) => {
+    const {
+      kategori_id,
+      isbn,
+      judul,
+      tahun_terbit,
+      jumlah_halaman,
+  
+      pegawai_id,
+      kuantitas,
+      harga_beli,
+  
+      penerbit_id,
+      penulis_id,
+  
+      tul_nama_penulis,
+      pen_nama,
+      pen_alamat,
+      pen_email,
+      pen_no_telp,
+  
+      s_nama,
+      s_no_telp,
+      s_alamat,
+  
+      supplier_id
+    } = req.body;
+  
+    // Basic validation
+    if (
+      !kategori_id || !isbn || !judul || !tahun_terbit || !jumlah_halaman ||
+      !pegawai_id || !kuantitas || !harga_beli
+    ) {
+      return res.status(400).json({ error: 'Data buku, pegawai, kuantitas, dan harga beli wajib diisi.' });
+    }
+  
+    try {
+      const query = `
+        CALL tambah_buku_baru(
+          $1, $2, $3, $4, $5,
+          $6, $7, $8,
+          $9, $10,
+          $11, $12, $13, $14, $15,
+          $16, $17, $18,
+          $19
+        )
+      `;
+  
+      const values = [
+        kategori_id,
+        isbn,
+        judul,
+        tahun_terbit,
+        jumlah_halaman,
+  
+        pegawai_id,
+        kuantitas,
+        harga_beli,
+  
+        penerbit_id,
+        penulis_id,
+  
+        tul_nama_penulis,
+        pen_nama,
+        pen_alamat,
+        pen_email,
+        pen_no_telp,
+  
+        s_nama,
+        s_no_telp,
+        s_alamat,
+  
+        supplier_id
+      ];
+  
+      await pool.query(query, values);
+  
+      res.status(201).json({ message: 'Buku baru berhasil ditambahkan beserta pembelian awal.' });
+    } catch (err) {
+      console.error('Error in tambah_buku_baru:', err);
+      res.status(500).json({ error: 'Gagal menambahkan buku.', detail: err.message });
+    }
+});
+
+
 // Start server
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
