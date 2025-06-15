@@ -582,21 +582,19 @@ app.post('/api/penjualan-buku', async (req, res) => {
 // insert new membership
 app.post('/api/membership/insert', async (req, res) => {
   const {
-    pelanggan_id,
+    nama,
     tipe,
     no_telp,
     alamat,
-    tanggal_pembuatan,
     tanggal_kadaluwarsa,
   } = req.body;
 
   try {
-    await pool.query('CALL sp_insert_membership($1, $2, $3, $4, $5, $6)', [
-      pelanggan_id,
+    await pool.query('CALL sp_insert_membership($1, $2, $3, $4, $5)', [
+      nama,
       tipe,
       no_telp,
       alamat,
-      tanggal_pembuatan,
       tanggal_kadaluwarsa,
     ]);
     res.status(201).json({ data: 'Membership berhasil ditambahkan.' });
@@ -609,11 +607,12 @@ app.post('/api/membership/insert', async (req, res) => {
 // Manajemen membership
 // Update membership
 app.put('/api/membership/update', async (req, res) => {
-  const { pelanggan_id, tipe, no_telp, alamat, tanggal_kadaluwarsa } = req.body;
+  const { membership_id, nama, tipe, no_telp, alamat, tanggal_kadaluwarsa } = req.body;
 
   try {
-    await pool.query('CALL sp_update_membership($1, $2, $3, $4, $5)', [
-      pelanggan_id,
+    await pool.query('CALL sp_update_membership($1, $2, $3, $4, $5, $6)', [
+      membership_id,
+      nama,
       tipe,
       no_telp,
       alamat,

@@ -679,46 +679,53 @@ EXECUTE FUNCTION kurangi_stok();
 
 -- for insert new membership
 CREATE OR REPLACE PROCEDURE sp_insert_membership(
-   IN p_pelanggan_id CHAR(8),
+	IN p_nama VARCHAR(100),
    IN p_tipe VARCHAR(20),
    IN p_no_telp VARCHAR(20),
    IN p_alamat VARCHAR(150),
-   IN p_tanggal_pembuatan TIMESTAMP,
    IN p_tanggal_kadaluwarsa TIMESTAMP
 )
 LANGUAGE plpgsql
 AS $$
 DECLARE
+	new_pelanggan_id CHAR(8);
    membership_count INT;
 BEGIN
    -- Validasi tanggal
-   IF p_tanggal_kadaluwarsa <= p_tanggal_pembuatan THEN
+   IF p_tanggal_kadaluwarsa <= NOW() THEN
        RAISE EXCEPTION 'Tanggal kadaluwarsa harus lebih besar dari tanggal pembuatan.';
    END IF;
 
    -- Cek apakah pelanggan sudah punya membership
    SELECT COUNT(*) INTO membership_count
-   FROM Membership
-   WHERE pelanggan_id = p_pelanggan_id;
+   FROM Membership m
+	JOIN Pelanggan p ON (m.pelanggan_id = p.pelanggan_id)
+   WHERE p.nama = p_nama;
 
    IF membership_count > 0 THEN
        RAISE EXCEPTION 'Membership untuk pelanggan ID % sudah ada.', p_pelanggan_id;
    END IF;
+
+	-- INSERT pelanggan baru
+	INSERT INTO Pelanggan (nama)
+	VALUES (p_nama)
+	RETURNING pelanggan_id INTO new_pelanggan_id;
 
    -- INSERT data baru
    INSERT INTO Membership (
        pelanggan_id, tipe, no_telp, alamat,
        tanggal_pembuatan, tanggal_kadaluwarsa
    ) VALUES (
-       p_pelanggan_id, p_tipe, p_no_telp, p_alamat,
-       p_tanggal_pembuatan, p_tanggal_kadaluwarsa
+       new_pelanggan_id, p_tipe, p_no_telp, p_alamat,
+       NOW(), p_tanggal_kadaluwarsa
    );
 END;
 $$;
 
 -- for update existing membership
 CREATE OR REPLACE PROCEDURE sp_update_membership(
-   IN p_pelanggan_id CHAR(8),
+   IN p_membership_id CHAR(8),
+	IN p_nama VARCHAR(100),
    IN p_tipe VARCHAR(20),
    IN p_no_telp VARCHAR(20),
    IN p_alamat VARCHAR(150),
@@ -727,15 +734,16 @@ CREATE OR REPLACE PROCEDURE sp_update_membership(
 LANGUAGE plpgsql
 AS $$
 DECLARE
-   membership_count INT;
+   p_tanggal_pembuatan TIMESTAMP;
+   p_pelanggan_id CHAR(8);
 BEGIN
-   -- Cek apakah membership ada
-   SELECT COUNT(*) INTO membership_count
+	SELECT pelanggan_id, tanggal_pembuatan INTO p_pelanggan_id, p_tanggal_pembuatan
    FROM Membership
-   WHERE pelanggan_id = p_pelanggan_id;
+   WHERE membership_id = p_membership_id;
 
-   IF membership_count = 0 THEN
-       RAISE EXCEPTION 'Membership untuk pelanggan ID % tidak ditemukan.', p_pelanggan_id;
+	-- Validasi tanggal
+   IF p_tanggal_kadaluwarsa <= NOW() OR p_tanggal_kadaluwarsa <= p_tanggal_pembuatan THEN
+       RAISE EXCEPTION 'Tanggal kadaluwarsa harus lebih besar dari tanggal pembuatan.';
    END IF;
 
    -- UPDATE data existing 
@@ -745,7 +753,13 @@ BEGIN
        no_telp = p_no_telp,
        alamat = p_alamat,
        tanggal_kadaluwarsa = p_tanggal_kadaluwarsa
-   WHERE pelanggan_id = p_pelanggan_id;
+   WHERE membership_id = p_membership_id;
+   
+   UPDATE Pelanggan
+   SET
+   		nama = p_nama
+	WHERE pelanggan_id = p_pelanggan_id;
+   
 END;
 $$;
 
