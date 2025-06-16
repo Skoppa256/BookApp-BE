@@ -24,15 +24,7 @@ app.get('/ping', (req, res) => {
   res.json({ data: 'Hello' });
 });
 
-const tables = [
-  'Pegawai',
-  'Membership',
-  'Penulis',
-  'Penerbit',
-  'Detail_Penjualan',
-  'Detail_Pembelian',
-  'Buku_Penulis',
-];
+const tables = ['Detail_Penjualan', 'Detail_Pembelian', 'Buku_Penulis'];
 
 tables.forEach((table) => {
   const route = `/${table.toLowerCase().replace(/_/g, '-')}`;
@@ -601,21 +593,18 @@ app.post('/api/penjualan-buku', async (req, res) => {
 
 // insert new membership
 app.post('/api/membership/insert', async (req, res) => {
-  const {
-    nama,
-    tipe,
-    no_telp,
-    alamat,
-    tanggal_kadaluwarsa,
-  } = req.body;
-
+  const { nama, tipe, no_telp, alamat } = req.body;
+  if (!nama || !tipe || !no_telp || !alamat) {
+    return res
+      .status(400)
+      .json({ error: 'Semua field harus diisi untuk menambahkan membership.' });
+  }
   try {
-    await pool.query('CALL sp_insert_membership($1, $2, $3, $4, $5)', [
+    await pool.query('CALL sp_insert_membership($1, $2, $3, $4)', [
       nama,
       tipe,
       no_telp,
       alamat,
-      tanggal_kadaluwarsa,
     ]);
     res.status(201).json({ data: 'Membership berhasil ditambahkan.' });
   } catch (err) {
@@ -627,11 +616,10 @@ app.post('/api/membership/insert', async (req, res) => {
 // Manajemen membership
 // Update membership
 app.put('/api/membership/update', async (req, res) => {
-  const { membership_id, nama, tipe, no_telp, alamat, tanggal_kadaluwarsa } = req.body;
+  const { nama, tipe, no_telp, alamat, tanggal_kadaluwarsa } = req.body;
 
   try {
-    await pool.query('CALL sp_update_membership($1, $2, $3, $4, $5, $6)', [
-      membership_id,
+    await pool.query('CALL sp_update_membership($1, $2, $3, $4, $5)', [
       nama,
       tipe,
       no_telp,
@@ -661,6 +649,26 @@ app.get('/api/kategori', async (req, res) => {
     res.json({ data: result.rows });
   } catch (err) {
     console.error('Error fetching kategori:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/penulis', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM penulis');
+    res.json({ data: result.rows });
+  } catch (err) {
+    console.error('Error fetching penulis:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/penerbit', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM penerbit');
+    res.json({ data: result.rows });
+  } catch (err) {
+    console.error('Error fetching penerbit:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -701,7 +709,7 @@ app.get('/api/laporan/keuangan-bulanan', async (req, res) => {
 });
 
 // Tambah Buku
-app.post('/api/tambah_buku', async (req, res) => {
+app.post('/api/tambah-buku', async (req, res) => {
   const {
     kategori_id,
     isbn,

@@ -679,8 +679,7 @@ CREATE OR REPLACE PROCEDURE sp_insert_membership(
 	IN p_nama VARCHAR(100),
    IN p_tipe VARCHAR(20),
    IN p_no_telp VARCHAR(20),
-   IN p_alamat VARCHAR(150),
-   IN p_tanggal_kadaluwarsa TIMESTAMP
+   IN p_alamat VARCHAR(150)
 )
 LANGUAGE plpgsql
 AS $$
@@ -688,16 +687,11 @@ DECLARE
 	new_pelanggan_id CHAR(8);
    membership_count INT;
 BEGIN
-   -- Validasi tanggal
-   IF p_tanggal_kadaluwarsa <= NOW() THEN
-       RAISE EXCEPTION 'Tanggal kadaluwarsa harus lebih besar dari tanggal pembuatan.';
-   END IF;
-
    -- Cek apakah pelanggan sudah punya membership
    SELECT COUNT(*) INTO membership_count
    FROM Membership m
 	JOIN Pelanggan p ON (m.pelanggan_id = p.pelanggan_id)
-   WHERE p.nama = p_nama;
+   WHERE p.nama = p_nama OR m.no_telp = p_no_telp;
 
    IF membership_count > 0 THEN
        RAISE EXCEPTION 'Membership untuk pelanggan ID % sudah ada.', p_pelanggan_id;
@@ -714,52 +708,50 @@ BEGIN
        tanggal_pembuatan, tanggal_kadaluwarsa
    ) VALUES (
        new_pelanggan_id, p_tipe, p_no_telp, p_alamat,
-       NOW(), p_tanggal_kadaluwarsa
+       NOW(), NOW() + INTERVAL '1 year'
    );
 END;
 $$;
 
+DROP PROCEDURE sp_update_membership
+
 -- for update existing membership
 CREATE OR REPLACE PROCEDURE sp_update_membership(
-   IN p_membership_id CHAR(8),
 	IN p_nama VARCHAR(100),
-   IN p_tipe VARCHAR(20),
-   IN p_no_telp VARCHAR(20),
-   IN p_alamat VARCHAR(150),
-   IN p_tanggal_kadaluwarsa TIMESTAMP
+	IN p_tipe VARCHAR(20),
+	IN p_no_telp VARCHAR(20),
+	IN p_alamat VARCHAR(150),
+	IN p_tanggal_kadaluwarsa DATE
 )
 LANGUAGE plpgsql
 AS $$
 DECLARE
-   p_tanggal_pembuatan TIMESTAMP;
-   p_pelanggan_id CHAR(8);
+	p_tanggal_pembuatan TIMESTAMP;
+	p_pelanggan_id CHAR(8);
 BEGIN
 	SELECT pelanggan_id, tanggal_pembuatan INTO p_pelanggan_id, p_tanggal_pembuatan
-   FROM Membership
-   WHERE membership_id = p_membership_id;
+	FROM Membership
+	WHERE no_telp = p_no_telp;
 
 	-- Validasi tanggal
-   IF p_tanggal_kadaluwarsa <= NOW() OR p_tanggal_kadaluwarsa <= p_tanggal_pembuatan THEN
-       RAISE EXCEPTION 'Tanggal kadaluwarsa harus lebih besar dari tanggal pembuatan.';
-   END IF;
+	IF p_tanggal_kadaluwarsa <= CURRENT_DATE OR p_tanggal_kadaluwarsa <= DATE(p_tanggal_pembuatan) THEN
+		RAISE EXCEPTION 'Tanggal kadaluwarsa harus lebih besar dari tanggal pembuatan.';
+	END IF;
 
-   -- UPDATE data existing 
-   UPDATE Membership
-   SET
-       tipe = p_tipe,
-       no_telp = p_no_telp,
-       alamat = p_alamat,
-       tanggal_kadaluwarsa = p_tanggal_kadaluwarsa
-   WHERE membership_id = p_membership_id;
-   
-   UPDATE Pelanggan
-   SET
-   		nama = p_nama
+	-- UPDATE data existing 
+	UPDATE Membership
+	SET
+		tipe = p_tipe,
+		alamat = p_alamat,
+		tanggal_kadaluwarsa = p_tanggal_kadaluwarsa::TIMESTAMP
+	WHERE no_telp = p_no_telp;
+
+	UPDATE Pelanggan
+	SET
+		nama = p_nama
 	WHERE pelanggan_id = p_pelanggan_id;
-   
 END;
 $$;
-
 
 -- 2.2.4 Analisis Bisnis dan laporan
 

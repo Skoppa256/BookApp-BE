@@ -206,9 +206,9 @@ SELECT * FROM rekomendasi_pembelian(25)
 CALL pembelian_buku(
 	'SP000001',
 	'PG000001',
-	ARRAY['BK000006'],
-	ARRAY[1],
-	ARRAY[40000.00]
+	ARRAY['BK000002', 'BK000001'],
+	ARRAY[100, 100],
+	ARRAY[40000.00, 35000.00]
 );
 
 -- Function cari_buku
@@ -299,21 +299,39 @@ CALL tambah_buku_baru(
 
 -- Procedure insert membership
 CALL sp_insert_membership(
-	'Andre Kim',
+  'PL000006',              -- pelanggan_id (CHAR(8))
   'Gold',                  -- tipe (VARCHAR)
-  '08123456733',           -- no_telp (VARCHAR)
+  '08123456789',           -- no_telp (VARCHAR)
   'Jl. Merdeka 123',       -- alamat (VARCHAR)
+  TIMESTAMP '2025-06-13 10:00:00',  -- tanggal_pembuatan
   TIMESTAMP '2026-06-13 10:00:00'   -- tanggal_kadaluwarsa
 );
 
 -- Procedure update membership
 CALL sp_update_membership(
-  'MB000001',              -- pelanggan_id (CHAR(8))
-	'Kim Dan Andre',
+  'PL000001',              -- pelanggan_id (CHAR(8))
   'Platinum',              -- tipe (VARCHAR)
+  '08123456789',           -- no_telp (VARCHAR)
+  'Jl. Merdeka Baru 456',  -- alamat (VARCHAR)
+  TIMESTAMP '2027-06-13 10:00:00'   -- tanggal_kadaluwarsa
+);
+
+-- Procedure insert membership
+CALL sp_insert_membership(
+	'Budi Gunawan',
+  'Gold',                  -- tipe (VARCHAR)
+  '08123456733',           -- no_telp (VARCHAR)
+  'Jl. Merdeka 123',       -- alamat (VARCHAR)
+);
+
+-- Procedure update membership
+CALL sp_update_membership(
+  'MB000001',              -- pelanggan_id (CHAR(8))
+	'Budi Santoso',         -- nama (VARCHAR)
+  'Gold',              -- tipe (VARCHAR)
   '08111222333',           -- no_telp (VARCHAR)
   '123 Maple Street',  -- alamat (VARCHAR)
-  TIMESTAMP '2100-06-13 10:00:00'   -- tanggal_kadaluwarsa
+  '2028-06-01'   -- tanggal_kadaluwarsa
 );
 
 SELECT event_object_table AS table_name,
@@ -395,4 +413,5 @@ WHERE s.supplier_id = 'SP000005'
 SELECT * FROM Pembelian p
 JOIN Detail_Pembelian dpb ON p.pembelian_id = dpb.pembelian_id
 WHERE dpb.pembelian_id = 'PB0000009'
+
 
